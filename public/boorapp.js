@@ -1483,8 +1483,8 @@ function init() {
 // ============================================================
 // DINOLOKET API — BOORSTAAT OPHALEN
 // ============================================================
-const DINO_API = 'https://www.dinoloket.nl/javascriptmodelviewer-web/rest/models/columns/virtual';
-const DINO_CONFIG_URL = 'https://www.dinoloket.nl/javascriptmodelviewer-web/rest/config';
+const DINO_API = '/api/dino/profile';
+const DINO_CONFIG_URL = '/api/dino/config';
 const PDOK_GEOCODE = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?q=';
 let dinoConfig = null;
 
