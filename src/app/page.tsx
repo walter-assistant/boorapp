@@ -547,7 +547,12 @@ const BOORAPP_HTML = `
           <div class="form-row full">
             <div class="form-group">
               <label>Verwachte bodemopbouw (uit DinoLoket)</label>
-              <textarea id="pva-bodemopbouw" rows="4" style="width:100%;padding:8px 10px;border:1px solid #d0d5dd;border-radius:5px;font-size:13px;font-family:inherit;resize:vertical;" placeholder="0-2m: Klei&#10;2-15m: Fijn zand&#10;15-40m: Klei (scheidende laag)&#10;40-225m: Grof zand"></textarea>
+              <div style="display:flex;gap:8px;margin-bottom:6px;">
+                <button type="button" id="btn-dino-fetch" onclick="fetchDinoLoketData()" style="padding:8px 16px;background:#1565c0;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">🔍 Ophalen uit DINOloket</button>
+                <span id="dino-status" style="font-size:12px;color:#666;align-self:center;"></span>
+              </div>
+              <textarea id="pva-bodemopbouw" rows="6" style="width:100%;padding:8px 10px;border:1px solid #d0d5dd;border-radius:5px;font-size:13px;font-family:inherit;resize:vertical;" placeholder="Klik op 'Ophalen uit DINOloket' of vul handmatig in:&#10;0-2m: Klei&#10;2-15m: Fijn zand&#10;15-40m: Klei (scheidende laag)&#10;40-225m: Grof zand"></textarea>
+              <textarea id="pva-boorstaat-diep" rows="6" style="width:100%;padding:8px 10px;border:1px solid #d0d5dd;border-radius:5px;font-size:13px;font-family:inherit;resize:vertical;margin-top:6px;display:none;" placeholder="Diep profiel (tot 250m)"></textarea>
             </div>
           </div>
           <div class="form-row">

@@ -1480,6 +1480,152 @@ function init() {
 }
 
 // ============================================================
+// ============================================================
+// DINOLOKET API — BOORSTAAT OPHALEN
+// ============================================================
+const DINO_API = 'https://www.dinoloket.nl/javascriptmodelviewer-web/rest/models/columns/virtual';
+const DINO_CONFIG_URL = 'https://www.dinoloket.nl/javascriptmodelviewer-web/rest/config';
+const PDOK_GEOCODE = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?q=';
+let dinoConfig = null;
+
+async function fetchDinoConfig() {
+  if (dinoConfig) return dinoConfig;
+  try {
+    const r = await fetch(DINO_CONFIG_URL, { headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' } });
+    dinoConfig = await r.json();
+    return dinoConfig;
+  } catch (e) { console.error('DINOloket config error:', e); return null; }
+}
+
+async function geocodeToRD(address) {
+  const r = await fetch(PDOK_GEOCODE + encodeURIComponent(address) + '&rows=1');
+  const data = await r.json();
+  if (!data.response || !data.response.docs || data.response.docs.length === 0) throw new Error('Adres niet gevonden');
+  const doc = data.response.docs[0];
+  // centroide_rd is "POINT(x y)" format
+  const match = doc.centroide_rd.match(/POINT\(([0-9.]+) ([0-9.]+)\)/);
+  if (!match) throw new Error('Geen RD-coördinaten gevonden');
+  return { x: parseFloat(match[1]), y: parseFloat(match[2]), display: doc.weergavenaam };
+}
+
+async function fetchDinoProfile(x, y, modelType, model, version, resolution, maxDepth) {
+  const body = {
+    language: 'nl', modelType, model, xcoordinate: x, ycoordinate: y,
+    depthReference: 'MV', resolution: parseInt(resolution), version
+  };
+  const r = await fetch(DINO_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await r.json();
+  if (data.status !== 1 || !data.columns || data.columns.length === 0) {
+    throw new Error(data.statusMessage || 'Geen data beschikbaar voor deze locatie');
+  }
+  return data;
+}
+
+function formatBoorstaat(data, maxDepth) {
+  // Find the lithostratigraphy column (DGM) or hydrogeology column (REGIS)
+  let col = data.columns.find(c => c.columnType === 'HYDROGEOLOGY') || data.columns.find(c => c.columnType === 'LITHOSTRATIGRAPHY') || data.columns[0];
+  
+  let lines = [];
+  lines.push(`Model: ${data.modelName} ${data.modelVersion} | Maaiveld: ${data.surfacelevelHeight ? data.surfacelevelHeight.toFixed(2) : '?'} m+NAP`);
+  lines.push('');
+  
+  for (const pm of col.profileMetadata) {
+    const vals = {};
+    for (const li of pm.layerInfos) vals[li.code] = li.value;
+    
+    const depth = vals['DEPTH'];
+    if (!depth) continue;
+    
+    // Parse depth to check against maxDepth
+    const depthMatch = depth.match(/([\d.]+)\s*m\s*-\s*([\d.]+)\s*m/);
+    if (depthMatch && parseFloat(depthMatch[1]) >= maxDepth) break;
+    
+    const strat = vals['LITHOSTRATIGRAPHY'] || vals['HYDROGEOLOGY'] || '';
+    const litho = vals['LITHOLOGY'] || '';
+    
+    // Truncate depth description at maxDepth if needed
+    let depthStr = depth;
+    if (depthMatch && parseFloat(depthMatch[2]) > maxDepth) {
+      depthStr = `${depthMatch[1]} m - ${maxDepth.toFixed(2)} m`;
+    }
+    
+    let line = `${depthStr}: ${strat}`;
+    if (litho) line += `\n  → ${litho}`;
+    lines.push(line);
+  }
+  
+  return lines.join('\n');
+}
+
+async function fetchDinoLoketData() {
+  const btn = document.getElementById('btn-dino-fetch');
+  const status = document.getElementById('dino-status');
+  const locatieEl = document.getElementById('pva-locatie');
+  const bodemEl = document.getElementById('pva-bodemopbouw');
+  const diepEl = document.getElementById('pva-boorstaat-diep');
+  
+  const address = locatieEl ? locatieEl.value.trim() : '';
+  if (!address) {
+    status.textContent = '⚠️ Vul eerst het adres in bij "Locatie opdracht"';
+    status.style.color = '#c62828';
+    return;
+  }
+  
+  btn.disabled = true;
+  btn.style.background = '#999';
+  status.textContent = '📍 Adres opzoeken...';
+  status.style.color = '#666';
+  
+  try {
+    // 1. Geocode address to RD
+    const geo = await geocodeToRD(address);
+    status.textContent = `📍 ${geo.display} (${geo.x.toFixed(0)}, ${geo.y.toFixed(0)}) — DINOloket ophalen...`;
+    
+    // 2. Get DINOloket config for versions
+    const config = await fetchDinoConfig();
+    if (!config) throw new Error('Kan DINOloket configuratie niet laden');
+    
+    // 3. Fetch DGM model (lithostratigrafie, tot ~50m voor ondiep profiel)
+    let shallowText = '';
+    try {
+      const dgm = await fetchDinoProfile(geo.x, geo.y, 'DGM', 'DGM', config.dgmVersion, config.dgmResolution || 100, 10);
+      shallowText = formatBoorstaat(dgm, 10);
+    } catch (e) {
+      shallowText = '(DGM data niet beschikbaar: ' + e.message + ')';
+    }
+    
+    // 4. Fetch REGIS model (hydrogeologie, tot 250m voor diep profiel)
+    let deepText = '';
+    try {
+      const regis = await fetchDinoProfile(geo.x, geo.y, 'RGS', 'REGIS', config.rgsVersion, config.rgsResolution || 100, 250);
+      deepText = formatBoorstaat(regis, 250);
+    } catch (e) {
+      deepText = '(REGIS data niet beschikbaar: ' + e.message + ')';
+    }
+    
+    // 5. Fill the fields
+    bodemEl.value = `=== ONDIEP PROFIEL (0-10 m-mv) ===\n${shallowText}`;
+    
+    // Show and fill deep profile
+    diepEl.style.display = 'block';
+    diepEl.value = `=== DIEP PROFIEL (0-250 m-mv) ===\n${deepText}`;
+    
+    status.textContent = `✅ Boorstaat opgehaald voor ${geo.display}`;
+    status.style.color = '#2e7d32';
+    
+  } catch (e) {
+    status.textContent = '❌ ' + e.message;
+    status.style.color = '#c62828';
+  } finally {
+    btn.disabled = false;
+    btn.style.background = '#1565c0';
+  }
+}
+
 // PLAN VAN AANPAK
 // ============================================================
 const PVA_PERSONEEL = [
@@ -1569,7 +1715,7 @@ function gatherPvaData() {
     telefoon: val('pva-telefoon'), bevoegd: val('pva-bevoegd'), datum: val('pva-datum'), locatie: val('pva-locatie'),
     personeel, doel: val('pva-doel'), beschrijving: val('pva-beschrijving'), scope: val('pva-scope'), brlScope,
     dinoloket: val('pva-dinoloket'), casing: val('pva-casing'),
-    bodemopbouw: val('pva-bodemopbouw'), grondwaterstand: val('pva-grondwaterstand'), scheidendelagen: val('pva-scheidendelagen'),
+    bodemopbouw: val('pva-bodemopbouw'), boorstaat_diep: val('pva-boorstaat-diep'), grondwaterstand: val('pva-grondwaterstand'), scheidendelagen: val('pva-scheidendelagen'),
     boormethode: val('pva-boormethode'), kraan: val('pva-kraan'), boorbuis: val('pva-boorbuis'),
     filterbuis: val('pva-filterbuis'), filterdiameter: val('pva-filterdiameter'),
     lussen: val('pva-lussen'), boordiepte: val('pva-boordiepte'), diepteperlus: val('pva-diepteperlus'),
@@ -1698,8 +1844,12 @@ function generatePvaPDF() {
   fieldRow('Scheidende lagen', p.scheidendelagen); y += 2;
 
   if (p.bodemopbouw) {
-    h2('Verwachte bodemopbouw');
+    h2('Verwachte bodemopbouw — Ondiep profiel');
     textBlock(p.bodemopbouw);
+  }
+  if (p.boorstaat_diep) {
+    h2('Verwachte bodemopbouw — Diep profiel (tot 250m)');
+    textBlock(p.boorstaat_diep);
   }
 
   h2('Boormethode & Materiaal');
