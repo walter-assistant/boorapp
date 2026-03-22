@@ -1609,10 +1609,14 @@ async function fetchDinoLoketData() {
     
     // 5. Fill the fields
     bodemEl.value = `=== ONDIEP PROFIEL (0-10 m-mv) ===\n${shallowText}`;
+    bodemEl.style.height = 'auto';
+    bodemEl.style.height = Math.min(400, bodemEl.scrollHeight + 4) + 'px';
     
     // Show and fill deep profile
     diepEl.style.display = 'block';
     diepEl.value = `=== DIEP PROFIEL (0-250 m-mv) ===\n${deepText}`;
+    diepEl.style.height = 'auto';
+    diepEl.style.height = Math.min(400, diepEl.scrollHeight + 4) + 'px';
     
     status.textContent = `✅ Boorstaat opgehaald voor ${geo.display}`;
     status.style.color = '#2e7d32';
