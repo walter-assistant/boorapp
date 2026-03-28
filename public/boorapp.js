@@ -1647,10 +1647,11 @@ function initPvaTab() {
       container.appendChild(lbl);
     }
   }
-  prefillPvaFromOfferte();
-
   // Restore saved PvA data (after DOM is built)
   autoRestoreAll();
+
+  // Prefill PvA vanuit offerte — NA autorestore zodat offerte-velden gevuld zijn
+  prefillPvaFromOfferte();
 }
 
 function prefillPvaFromOfferte() {
