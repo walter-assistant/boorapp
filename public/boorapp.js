@@ -1,4 +1,41 @@
 // ============================================================
+// DROPBOX AUTO-SAVE
+// ============================================================
+async function uploadToDropbox(pdfDoc, filename, klant, projectnr, docType) {
+  try {
+    var pdfBase64 = pdfDoc.output('datauristring').split(',')[1];
+    var klantFolder = (klant || 'Zonder_klant').replace(/[^a-zA-Z0-9 _-]/g, '').trim();
+    var projectFolder = (projectnr || 'Zonder_projectnummer').replace(/[^a-zA-Z0-9 _-]/g, '').trim();
+    var dropboxPath = '/Ground Research/' + klantFolder + '/' + projectFolder + '/' + docType + '/' + filename;
+    var response = await fetch('/api/dropbox/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filePath: dropboxPath, fileContent: pdfBase64, fileName: filename })
+    });
+    var result = await response.json();
+    if (result.success) {
+      showDropboxNotification('\u2601\ufe0f Opgeslagen in Dropbox: ' + result.path, 'success');
+    } else {
+      console.error('Dropbox upload failed:', result.error);
+      showDropboxNotification('\u26a0\ufe0f Dropbox: ' + result.error, 'error');
+    }
+  } catch (err) {
+    console.error('Dropbox upload error:', err);
+    showDropboxNotification('\u26a0\ufe0f Dropbox upload mislukt (geen verbinding?)', 'error');
+  }
+}
+
+function showDropboxNotification(message, type) {
+  var existing = document.getElementById('dropbox-notification');
+  if (existing) existing.remove();
+  var div = document.createElement('div');
+  div.id = 'dropbox-notification';
+  div.textContent = message;
+  div.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;padding:12px 20px;border-radius:8px;font-size:14px;color:white;box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:opacity 0.5s;opacity:1;background:' + (type === 'success' ? '#27ae60' : '#e74c3c') + ';';
+  document.body.appendChild(div);
+  setTimeout(function() { div.style.opacity = '0'; setTimeout(function() { div.remove(); }, 500); }, 4000);
+}
+// ============================================================
 // DATA & STATE
 // ============================================================
 const DEFAULT_KLANTEN = [
@@ -21,9 +58,9 @@ function getKlanten() {
   if (!k) { localStorage.setItem('gr_klanten', JSON.stringify(DEFAULT_KLANTEN)); return [...DEFAULT_KLANTEN]; }
   return JSON.parse(k);
 }
-function saveKlanten(arr) { localStorage.setItem('gr_klanten', JSON.stringify(arr)); if (window.__supabaseSave) window.__supabaseSave('gr_klanten', arr); }
+function saveKlanten(arr) { localStorage.setItem('gr_klanten', JSON.stringify(arr)); }
 function getOffertes() { return JSON.parse(localStorage.getItem('gr_offertes') || '[]'); }
-function saveOffertes(arr) { localStorage.setItem('gr_offertes', JSON.stringify(arr)); if (window.__supabaseSave) window.__supabaseSave('gr_offertes', arr); }
+function saveOffertes(arr) { localStorage.setItem('gr_offertes', JSON.stringify(arr)); }
 
 // ============================================================
 // FORMATTING
@@ -579,7 +616,64 @@ function downloadWKOPdf() {
 
   const filename = `WKO_Rapport_${(r.location?.address || r.address).replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
   pdf.save(filename);
+
+  // Klant en project ophalen: eerst uit offerte-formulier, dan uit opslag, dan vragen
+  var wkoKlant = ''; try { var sel = document.getElementById('f-klant'); if (sel && sel.selectedOptions[0]) wkoKlant = sel.selectedOptions[0].textContent || ''; } catch(e) {}
+  var wkoProjectNr = ''; try { wkoProjectNr = document.getElementById('f-projectnr')?.value || ''; } catch(e) {}
+
+  // Toon opslaan-dialoog
+  showWKOSaveDialog(pdf, filename, wkoKlant, wkoProjectNr, r);
 }
+
+function showWKOSaveDialog(pdf, filename, defaultKlant, defaultProject, report) {
+  var existing = document.getElementById('wko-save-dialog');
+  if (existing) existing.remove();
+
+  var klanten = getKlanten();
+  var klantOptions = '<option value="">-- Selecteer klant --</option>' + klanten.map(function(k){
+    var selected = k.bedrijf === defaultKlant ? ' selected' : '';
+    return '<option value="' + k.bedrijf + '"' + selected + '>' + k.bedrijf + '</option>';
+  }).join('');
+
+  var overlay = document.createElement('div');
+  overlay.id = 'wko-save-dialog';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = '<div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,0.3)">' +
+    '<h3 style="margin:0 0 16px;color:#1e3a5f;font-size:16px">\u2601\ufe0f WKO Rapport opslaan</h3>' +
+    '<label style="font-size:12px;font-weight:600;color:#555">Klantnaam</label>' +
+    '<select id="wko-save-klant" style="width:100%;padding:8px;margin:4px 0 12px;border:1px solid #ccc;border-radius:6px;font-size:14px">' + klantOptions + '</select>' +
+    '<label style="font-size:12px;font-weight:600;color:#555">Projectnummer</label>' +
+    '<input id="wko-save-project" type="text" value="' + (defaultProject || '') + '" placeholder="bijv. 2024-045" style="width:100%;padding:8px;margin:4px 0 12px;border:1px solid #ccc;border-radius:6px;font-size:14px;box-sizing:border-box">' +
+    '<div style="display:flex;gap:8px;margin-top:8px">' +
+    '<button onclick="doWKODropboxSave()" style="flex:1;padding:10px;background:#2d7d46;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">\u2601\ufe0f Opslaan in Dropbox</button>' +
+    '<button onclick="document.getElementById(\'wko-save-dialog\').remove()" style="padding:10px 16px;background:#eee;color:#333;border:none;border-radius:8px;font-size:14px;cursor:pointer">Annuleren</button>' +
+    '</div></div>';
+  document.body.appendChild(overlay);
+
+  // Store pdf reference for the save function
+  window._wkoSavePdf = pdf;
+  window._wkoSaveFilename = filename;
+  window._wkoSaveReport = report;
+}
+
+function doWKODropboxSave() {
+  var klant = document.getElementById('wko-save-klant').value || '';
+  var project = document.getElementById('wko-save-project').value.trim() || 'onbekend';
+  var pdf = window._wkoSavePdf;
+  var filename = window._wkoSaveFilename;
+
+  if (!klant) { alert('Selecteer een klant'); return; }
+  if (!project || project === 'onbekend') { alert('Vul een projectnummer in'); return; }
+
+  uploadToDropbox(pdf, filename, klant, project, 'WKO_Rapport');
+  document.getElementById('wko-save-dialog').remove();
+
+  // Cleanup
+  window._wkoSavePdf = null;
+  window._wkoSaveFilename = null;
+  window._wkoSaveReport = null;
+}
+window.doWKODropboxSave = doWKODropboxSave;
 
 function updateLusOpties() {
   const diameter = parseInt(document.getElementById('f-diameter').value);
@@ -1452,6 +1546,8 @@ function generatePDF() {
   // Save/download
   const filename = `Offerte_${d.kenmerk || 'draft'}_${d.klantNaam || 'klant'}.pdf`.replace(/\s+/g, '_');
   doc.save(filename);
+  var offerteProject = ((d.kenmerk || '') + (d.locatie ? '-' + d.locatie : '')).trim() || 'draft';
+  uploadToDropbox(doc, filename, d.klantNaam || '', offerteProject, 'Offerte');
 }
 
 function formatDate(dateStr) {
@@ -1463,6 +1559,78 @@ function formatDate(dateStr) {
 // ============================================================
 // INIT
 // ============================================================
+// ============================================================
+// AUTO-SAVE (localStorage)
+// ============================================================
+const AUTOSAVE_KEY = 'boorapp_autosave';
+const AUTOSAVE_DELAY = 500; // ms debounce
+let _saveTimer = null;
+
+function autoSaveAll() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    const data = {};
+    // Save all inputs, selects, textareas by id
+    document.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
+      if (el.id.startsWith('km-') || el.id.startsWith('modal')) return; // skip modal fields
+      if (el.type === 'checkbox') {
+        data[el.id] = el.checked;
+      } else {
+        data[el.id] = el.value;
+      }
+    });
+    // Save personnel checkboxes (no id, use class + value)
+    const personeel = [];
+    document.querySelectorAll('.pva-personeel').forEach(cb => {
+      if (cb.checked) personeel.push(cb.value);
+    });
+    data._pvaPersoneel = personeel;
+    // Save "Anders" text fields
+    const anders = [];
+    document.querySelectorAll('.pva-personeel-anders').forEach(el => {
+      anders.push(el.value);
+    });
+    data._pvaAndersText = anders;
+
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
+  }, AUTOSAVE_DELAY);
+}
+
+function autoRestoreAll() {
+  const raw = localStorage.getItem(AUTOSAVE_KEY);
+  if (!raw) return;
+  try {
+    const data = JSON.parse(raw);
+    for (const [id, val] of Object.entries(data)) {
+      if (id.startsWith('_')) continue; // special keys
+      const el = document.getElementById(id);
+      if (!el) continue;
+      if (el.type === 'checkbox') {
+        el.checked = !!val;
+      } else {
+        el.value = val;
+      }
+    }
+    // Restore personnel checkboxes
+    if (data._pvaPersoneel) {
+      document.querySelectorAll('.pva-personeel').forEach(cb => {
+        cb.checked = data._pvaPersoneel.includes(cb.value);
+      });
+    }
+    if (data._pvaAndersText) {
+      document.querySelectorAll('.pva-personeel-anders').forEach((el, i) => {
+        if (data._pvaAndersText[i]) el.value = data._pvaAndersText[i];
+      });
+    }
+  } catch (e) { /* ignore corrupt data */ }
+}
+
+function attachAutoSave() {
+  // Listen on the whole document for changes
+  document.addEventListener('input', autoSaveAll);
+  document.addEventListener('change', autoSaveAll);
+}
+
 function init() {
   // Set today's date
   document.getElementById('f-datum').value = new Date().toISOString().substring(0, 10);
@@ -1477,159 +1645,15 @@ function init() {
 
   // Initial calculation
   calc();
+
+  // Auto-restore saved form data (offerte tab)
+  autoRestoreAll();
+
+  // Attach auto-save listeners
+  attachAutoSave();
 }
 
 // ============================================================
-// ============================================================
-// DINOLOKET API — BOORSTAAT OPHALEN
-// ============================================================
-const DINO_API = '/api/dino/profile';
-const DINO_CONFIG_URL = '/api/dino/config';
-const PDOK_GEOCODE = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?q=';
-let dinoConfig = null;
-
-async function fetchDinoConfig() {
-  if (dinoConfig) return dinoConfig;
-  try {
-    const r = await fetch(DINO_CONFIG_URL, { headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' } });
-    dinoConfig = await r.json();
-    return dinoConfig;
-  } catch (e) { console.error('DINOloket config error:', e); return null; }
-}
-
-async function geocodeToRD(address) {
-  const r = await fetch(PDOK_GEOCODE + encodeURIComponent(address) + '&rows=1');
-  const data = await r.json();
-  if (!data.response || !data.response.docs || data.response.docs.length === 0) throw new Error('Adres niet gevonden');
-  const doc = data.response.docs[0];
-  // centroide_rd is "POINT(x y)" format
-  const match = doc.centroide_rd.match(/POINT\(([0-9.]+) ([0-9.]+)\)/);
-  if (!match) throw new Error('Geen RD-coördinaten gevonden');
-  return { x: parseFloat(match[1]), y: parseFloat(match[2]), display: doc.weergavenaam };
-}
-
-async function fetchDinoProfile(x, y, modelType, model, version, resolution, maxDepth) {
-  const body = {
-    language: 'nl', modelType, model, xcoordinate: x, ycoordinate: y,
-    depthReference: 'MV', resolution: parseInt(resolution), version
-  };
-  const r = await fetch(DINO_API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  const data = await r.json();
-  if (data.status !== 1 || !data.columns || data.columns.length === 0) {
-    throw new Error(data.statusMessage || 'Geen data beschikbaar voor deze locatie');
-  }
-  return data;
-}
-
-function formatBoorstaat(data, maxDepth) {
-  // Find the lithostratigraphy column (DGM) or hydrogeology column (REGIS)
-  let col = data.columns.find(c => c.columnType === 'HYDROGEOLOGY') || data.columns.find(c => c.columnType === 'LITHOSTRATIGRAPHY') || data.columns[0];
-  
-  let lines = [];
-  lines.push(`Model: ${data.modelName} ${data.modelVersion} | Maaiveld: ${data.surfacelevelHeight ? data.surfacelevelHeight.toFixed(2) : '?'} m+NAP`);
-  lines.push('');
-  
-  for (const pm of col.profileMetadata) {
-    const vals = {};
-    for (const li of pm.layerInfos) vals[li.code] = li.value;
-    
-    const depth = vals['DEPTH'];
-    if (!depth) continue;
-    
-    // Parse depth to check against maxDepth
-    const depthMatch = depth.match(/([\d.]+)\s*m\s*-\s*([\d.]+)\s*m/);
-    if (depthMatch && parseFloat(depthMatch[1]) >= maxDepth) break;
-    
-    const strat = vals['LITHOSTRATIGRAPHY'] || vals['HYDROGEOLOGY'] || '';
-    const litho = vals['LITHOLOGY'] || '';
-    
-    // Truncate depth description at maxDepth if needed
-    let depthStr = depth;
-    if (depthMatch && parseFloat(depthMatch[2]) > maxDepth) {
-      depthStr = `${depthMatch[1]} m - ${maxDepth.toFixed(2)} m`;
-    }
-    
-    let line = `${depthStr}: ${strat}`;
-    if (litho) line += `\n  → ${litho}`;
-    lines.push(line);
-  }
-  
-  return lines.join('\n');
-}
-
-async function fetchDinoLoketData() {
-  const btn = document.getElementById('btn-dino-fetch');
-  const status = document.getElementById('dino-status');
-  const locatieEl = document.getElementById('pva-locatie');
-  const bodemEl = document.getElementById('pva-bodemopbouw');
-  const diepEl = document.getElementById('pva-boorstaat-diep');
-  
-  const address = locatieEl ? locatieEl.value.trim() : '';
-  if (!address) {
-    status.textContent = '⚠️ Vul eerst het adres in bij "Locatie opdracht"';
-    status.style.color = '#c62828';
-    return;
-  }
-  
-  btn.disabled = true;
-  btn.style.background = '#999';
-  status.textContent = '📍 Adres opzoeken...';
-  status.style.color = '#666';
-  
-  try {
-    // 1. Geocode address to RD
-    const geo = await geocodeToRD(address);
-    status.textContent = `📍 ${geo.display} (${geo.x.toFixed(0)}, ${geo.y.toFixed(0)}) — DINOloket ophalen...`;
-    
-    // 2. Get DINOloket config for versions
-    const config = await fetchDinoConfig();
-    if (!config) throw new Error('Kan DINOloket configuratie niet laden');
-    
-    // 3. Fetch DGM model (lithostratigrafie, tot ~50m voor ondiep profiel)
-    let shallowText = '';
-    try {
-      const dgm = await fetchDinoProfile(geo.x, geo.y, 'DGM', 'DGM', config.dgmVersion, config.dgmResolution || 100, 10);
-      shallowText = formatBoorstaat(dgm, 10);
-    } catch (e) {
-      shallowText = '(DGM data niet beschikbaar: ' + e.message + ')';
-    }
-    
-    // 4. Fetch REGIS model (hydrogeologie, tot 250m voor diep profiel)
-    let deepText = '';
-    try {
-      const regis = await fetchDinoProfile(geo.x, geo.y, 'RGS', 'REGIS', config.rgsVersion, config.rgsResolution || 100, 250);
-      deepText = formatBoorstaat(regis, 250);
-    } catch (e) {
-      deepText = '(REGIS data niet beschikbaar: ' + e.message + ')';
-    }
-    
-    // 5. Fill the fields
-    bodemEl.value = `=== ONDIEP PROFIEL (0-10 m-mv) ===\n${shallowText}`;
-    bodemEl.style.height = 'auto';
-    bodemEl.style.height = Math.min(400, bodemEl.scrollHeight + 4) + 'px';
-    
-    // Show and fill deep profile
-    diepEl.style.display = 'block';
-    diepEl.value = `=== DIEP PROFIEL (0-250 m-mv) ===\n${deepText}`;
-    diepEl.style.height = 'auto';
-    diepEl.style.height = Math.min(400, diepEl.scrollHeight + 4) + 'px';
-    
-    status.textContent = `✅ Boorstaat opgehaald voor ${geo.display}`;
-    status.style.color = '#2e7d32';
-    
-  } catch (e) {
-    status.textContent = '❌ ' + e.message;
-    status.style.color = '#c62828';
-  } finally {
-    btn.disabled = false;
-    btn.style.background = '#1565c0';
-  }
-}
-
 // PLAN VAN AANPAK
 // ============================================================
 const PVA_PERSONEEL = [
@@ -1652,6 +1676,9 @@ function initPvaTab() {
     }
   }
   prefillPvaFromOfferte();
+
+  // Restore saved PvA data (after DOM is built)
+  autoRestoreAll();
 }
 
 function prefillPvaFromOfferte() {
@@ -1719,7 +1746,7 @@ function gatherPvaData() {
     telefoon: val('pva-telefoon'), bevoegd: val('pva-bevoegd'), datum: val('pva-datum'), locatie: val('pva-locatie'),
     personeel, doel: val('pva-doel'), beschrijving: val('pva-beschrijving'), scope: val('pva-scope'), brlScope,
     dinoloket: val('pva-dinoloket'), casing: val('pva-casing'),
-    bodemopbouw: val('pva-bodemopbouw'), boorstaat_diep: val('pva-boorstaat-diep'), grondwaterstand: val('pva-grondwaterstand'), scheidendelagen: val('pva-scheidendelagen'),
+    bodemopbouw: val('pva-bodemopbouw'), grondwaterstand: val('pva-grondwaterstand'), scheidendelagen: val('pva-scheidendelagen'),
     boormethode: val('pva-boormethode'), kraan: val('pva-kraan'), boorbuis: val('pva-boorbuis'),
     filterbuis: val('pva-filterbuis'), filterdiameter: val('pva-filterdiameter'),
     lussen: val('pva-lussen'), boordiepte: val('pva-boordiepte'), diepteperlus: val('pva-diepteperlus'),
@@ -1848,12 +1875,161 @@ function generatePvaPDF() {
   fieldRow('Scheidende lagen', p.scheidendelagen); y += 2;
 
   if (p.bodemopbouw) {
-    h2('Verwachte bodemopbouw — Ondiep profiel');
+    h2('Verwachte bodemopbouw');
     textBlock(p.bodemopbouw);
   }
-  if (p.boorstaat_diep) {
-    h2('Verwachte bodemopbouw — Diep profiel (tot 250m)');
-    textBlock(p.boorstaat_diep);
+
+  // ===================== VISUELE BOORSTAAT IN PDF =====================
+  if (bsData && bsData.layers.length > 0) {
+    pdf.addPage();
+    y = 15;
+    h1('VISUELE BOORSTAAT (GeoTOP v1.6.1)');
+    y += 2;
+    pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...GRIJS);
+    pdf.text(`${bsData.locationName}  |  RD: ${bsData.rdX}, ${bsData.rdY}  |  Maaiveld: ${bsData.maaiveldNAP.toFixed(2)} m NAP`, M, y);
+    y += 6;
+
+    // Draw boorstaat columns in PDF
+    const bsX0 = M + 15; // left margin for depth labels
+    const BAR_W_PDF = 25; // lithok bar width
+    const STRAT_W_PDF = 22; // strat column width
+    const GAP = 2;
+    const boordiepte = parseFloat(p.boordiepte) || Math.ceil(bsData.maxDepthMV);
+    const maxD = Math.min(boordiepte + 10, Math.ceil(bsData.maxDepthMV));
+    const availH = 240; // mm available on page
+    const pxPerM = availH / maxD;
+    const bsY0 = y + 8;
+
+    // Column headers
+    pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...BLAUW);
+    pdf.text('Diepte', M, bsY0 - 3);
+    pdf.text('Lithologie', bsX0 + BAR_W_PDF / 2, bsY0 - 3, { align: 'center' });
+    pdf.text('Formatie', bsX0 + BAR_W_PDF + GAP + STRAT_W_PDF / 2, bsY0 - 3, { align: 'center' });
+
+    // Depth ticks
+    const tickI = maxD <= 15 ? 1 : maxD <= 50 ? 5 : maxD <= 100 ? 10 : 25;
+    pdf.setFontSize(6); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(100, 100, 100);
+    pdf.setDrawColor(200, 200, 200); pdf.setLineWidth(0.1);
+    for (let d = 0; d <= maxD; d += tickI) {
+      const yy = bsY0 + d * pxPerM;
+      pdf.line(bsX0 - 2, yy, bsX0 + BAR_W_PDF, yy);
+      pdf.text(d + 'm', bsX0 - 3, yy + 1, { align: 'right' });
+      // NAP value
+      pdf.setTextColor(150, 150, 150);
+      pdf.text((bsData.maaiveldNAP - d).toFixed(1), M - 1, yy + 1, { align: 'left' });
+      pdf.setTextColor(100, 100, 100);
+    }
+
+    // Lithok bars
+    const fl = bsData.layers.filter(l => l.botMV <= maxD && l.topMV >= 0);
+    for (const l of fl) {
+      const top = Math.max(l.topMV, 0), bot = Math.min(l.botMV, maxD);
+      const yt = bsY0 + top * pxPerM;
+      const h = (bot - top) * pxPerM;
+      const c = LITHOK[l.lithok] || { color: '#ddd' };
+      // Parse hex color
+      const hex = c.color.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      pdf.setFillColor(r, g, b);
+      pdf.rect(bsX0, yt, BAR_W_PDF, h, 'F');
+    }
+    // Border around lithok
+    pdf.setDrawColor(50, 50, 50); pdf.setLineWidth(0.3);
+    pdf.rect(bsX0, bsY0, BAR_W_PDF, maxD * pxPerM, 'S');
+
+    // Strat groups
+    let prevS = null, stratTop = 0;
+    const stratGroups = [];
+    for (const l of fl) {
+      if (l.strat !== prevS) { if (prevS !== null) stratGroups.push({ s: prevS, t: stratTop, b: l.topMV }); prevS = l.strat; stratTop = l.topMV; }
+    }
+    if (prevS !== null && fl.length) stratGroups.push({ s: prevS, t: stratTop, b: fl[fl.length - 1].botMV });
+
+    const stratColors = [[227,242,253],[255,243,224],[232,245,233],[252,228,236],[243,229,245],[224,242,241],[255,249,196],[239,235,233]];
+    const uniqueS = [...new Set(stratGroups.map(g => g.s))];
+    const sx0 = bsX0 + BAR_W_PDF + GAP;
+    for (const g of stratGroups) {
+      const top = Math.max(g.t, 0), bot = Math.min(g.b, maxD);
+      const yt = bsY0 + top * pxPerM;
+      const h = (bot - top) * pxPerM;
+      const sc = stratColors[uniqueS.indexOf(g.s) % stratColors.length];
+      pdf.setFillColor(sc[0], sc[1], sc[2]);
+      pdf.rect(sx0, yt, STRAT_W_PDF, h, 'F');
+      pdf.setDrawColor(180, 180, 180); pdf.setLineWidth(0.15);
+      pdf.rect(sx0, yt, STRAT_W_PDF, h, 'S');
+      if (h > 3) {
+        const nm = STRAT_NAMES[g.s] || '';
+        if (nm) {
+          pdf.setFontSize(5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(50, 50, 50);
+          const shortNm = nm.length > 14 ? nm.substring(0, 13) + '\u2026' : nm;
+          pdf.text(shortNm, sx0 + STRAT_W_PDF / 2, yt + h / 2 + 1.5, { align: 'center' });
+        }
+      }
+    }
+    // Border around strat
+    pdf.setDrawColor(50, 50, 50); pdf.setLineWidth(0.3);
+    pdf.rect(sx0, bsY0, STRAT_W_PDF, maxD * pxPerM, 'S');
+
+    // Litho labels (grouped) right side
+    let prevL = null, lithoTop = 0;
+    const lithoGroups = [];
+    for (const l of fl) {
+      if (l.lithok !== prevL) { if (prevL !== null) lithoGroups.push({ k: prevL, t: lithoTop, b: l.topMV }); prevL = l.lithok; lithoTop = l.topMV; }
+    }
+    if (prevL !== null && fl.length) lithoGroups.push({ k: prevL, t: lithoTop, b: fl[fl.length - 1].botMV });
+
+    const labelX = sx0 + STRAT_W_PDF + 4;
+    pdf.setFontSize(6); pdf.setFont('helvetica', 'normal');
+    for (const g of lithoGroups) {
+      const top = Math.max(g.t, 0), bot = Math.min(g.b, maxD);
+      const h = (bot - top) * pxPerM;
+      if (h < 2.5) continue;
+      const ym = bsY0 + ((top + bot) / 2) * pxPerM;
+      pdf.setTextColor(60, 60, 60);
+      pdf.text(`${(LITHOK[g.k] || {}).name || '?'} (${top.toFixed(1)}\u2013${bot.toFixed(1)}m)`, labelX, ym + 1);
+    }
+
+    // Maaiveld indicator
+    pdf.setFillColor(46, 125, 50); pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(46, 125, 50);
+    pdf.text('\u25BC Maaiveld', bsX0, bsY0 - 6);
+
+    // Boordiepte indicator (dashed line)
+    if (parseFloat(p.boordiepte) && parseFloat(p.boordiepte) <= maxD) {
+      const bdY = bsY0 + parseFloat(p.boordiepte) * pxPerM;
+      pdf.setDrawColor(198, 40, 40); pdf.setLineWidth(0.4);
+      // Draw dashed line
+      const dashLen = 2, gapLen = 1.5;
+      for (let dx = bsX0 - 4; dx < bsX0 + BAR_W_PDF + GAP + STRAT_W_PDF + 4; dx += dashLen + gapLen) {
+        pdf.line(dx, bdY, Math.min(dx + dashLen, bsX0 + BAR_W_PDF + GAP + STRAT_W_PDF + 4), bdY);
+      }
+      pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(198, 40, 40);
+      pdf.text(`\u25BC Boordiepte ${p.boordiepte}m`, labelX, bdY + 1);
+    }
+
+    // Legend
+    y = bsY0 + maxD * pxPerM + 8;
+    if (y + 15 > 275) { pdf.addPage(); y = 15; }
+    h2('Legenda');
+    const usedLithok = new Set(fl.map(l => l.lithok));
+    let legX = M + 2;
+    pdf.setFontSize(6);
+    for (const [code, info] of Object.entries(LITHOK)) {
+      if (!usedLithok.has(parseInt(code))) continue;
+      const hex = info.color.replace('#', '');
+      pdf.setFillColor(parseInt(hex.substring(0,2),16), parseInt(hex.substring(2,4),16), parseInt(hex.substring(4,6),16));
+      pdf.rect(legX, y - 2, 5, 3, 'F');
+      pdf.setDrawColor(150,150,150); pdf.setLineWidth(0.1); pdf.rect(legX, y - 2, 5, 3, 'S');
+      pdf.setFont('helvetica', 'normal'); pdf.setTextColor(60, 60, 60);
+      pdf.text(info.name, legX + 6.5, y + 0.5);
+      legX += 28;
+      if (legX > W - M - 20) { legX = M + 2; y += 5; }
+    }
+    y += 6;
+    pdf.setFontSize(6); pdf.setFont('helvetica', 'italic'); pdf.setTextColor(...LGRIJS);
+    pdf.text('Bron: TNO GeoTOP v1.6.1 \u2014 Dit is een modelmatige verwachting, geen daadwerkelijke boorgegevens.', M, y);
+    y += 6;
   }
 
   h2('Boormethode & Materiaal');
@@ -1992,6 +2168,245 @@ function generatePvaPDF() {
 
   const filename = `PvA_${p.projectnr || 'draft'}_${p.klant || ''}.pdf`.replace(/[^a-zA-Z0-9_.-]/g, '_');
   pdf.save(filename);
+  var pvaProject = ((p.projectnr || '') + (p.locatie ? '-' + p.locatie : '')).trim() || 'draft';
+  uploadToDropbox(pdf, filename, p.klant || '', pvaProject, 'PvA');
 }
 
 if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+// ============================================
+// VISUELE BOORSTAAT (GeoTOP v1.6.1)
+// ============================================
+const GEOTOP_BASE = 'https://www.dinodata.nl/opendap/GeoTOP/geotop.nc.json';
+const GT_X0 = 13600, GT_Y0 = 338500, GT_STEP = 100, GT_ZCOUNT = 313, GT_ZSTEP = 0.5;
+
+const LITHOK = {
+  1: { name: 'Antropogeen', color: '#808080' },
+  2: { name: 'Veen', color: '#8B4513' },
+  3: { name: 'Klei', color: '#2E8B57' },
+  4: { name: 'Kleiig zand / leem', color: '#A8C686' },
+  5: { name: 'Zand fijn', color: '#F5E6A3' },
+  6: { name: 'Zand midden', color: '#E6C84D' },
+  7: { name: 'Zand grof', color: '#C8A02D' },
+  8: { name: 'Grind', color: '#CC3333' },
+  9: { name: 'Schelpen', color: '#F0E68C' },
+};
+
+const STRAT_NAMES = {
+  1000:'Fm. Peize',1010:'Fm. Waalre',1100:'Fm. Urk',1110:'Fm. Sterksel',
+  2000:'Fm. Stramproy',2010:'Fm. Beegden',3000:'Fm. Tegelen',
+  4000:'Fm. Peelo',4010:'Fm. Drente',5000:'Fm. Eem',5010:'Fm. Kreftenheye',
+  5020:'Fm. Twente',5050:'Fm. Boxtel',5060:'Fm. Maassluis',
+  6000:'Fm. Naaldwijk',6010:'Lp. Wormer',6020:'Lp. Velsen',6030:'Lp. Schoorl',
+  6400:'Fm. Nieuwkoop',6410:'Hollandveen Lp.',6420:'Basisveen Lp.',
+  6500:'Fm. Echteld',
+};
+
+let bsData = null, bsView = 'both';
+
+function bsLog(msg) {
+  const el = document.getElementById('pva-bs-log');
+  el.style.display = 'block';
+  el.textContent += msg + '\n';
+  el.scrollTop = el.scrollHeight;
+}
+
+async function fetchBoorstaat() {
+  const addr = document.getElementById('pva-locatie').value.trim();
+  if (!addr) { alert('Vul eerst een adres in bij "Locatie opdracht"'); return; }
+
+  document.getElementById('pva-bs-log').textContent = '';
+  document.getElementById('pva-bs-area').innerHTML = '<div style="color:#888; padding:20px; text-align:center;"><span style="display:inline-block;width:18px;height:18px;border:3px solid #e8ecf1;border-top-color:#1e3a5f;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px;"></span>Bezig met ophalen...</div>';
+
+  try {
+    bsLog('📍 Adres opzoeken via PDOK...');
+    const pdok = await fetch(`https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?q=${encodeURIComponent(addr)}&rows=1`);
+    const pdokData = await pdok.json();
+    const doc = pdokData?.response?.docs?.[0];
+    if (!doc) throw new Error('Adres niet gevonden');
+
+    const rdM = doc.centroide_rd?.match(/POINT\(([^ ]+) ([^ ]+)\)/);
+    if (!rdM) throw new Error('Geen RD-coördinaten');
+    const rdX = parseFloat(rdM[1]), rdY = parseFloat(rdM[2]);
+    bsLog(`✔ ${doc.weergavenaam} (RD: ${Math.round(rdX)}, ${Math.round(rdY)})`);
+
+    if (rdX < GT_X0 || rdX > 278200 || rdY < GT_Y0 || rdY > 619600) throw new Error('Buiten GeoTOP bereik');
+
+    const xi = Math.round((rdX - GT_X0) / GT_STEP);
+    const yi = Math.round((rdY - GT_Y0) / GT_STEP);
+    bsLog('🔄 GeoTOP data ophalen...');
+
+    const url = `${GEOTOP_BASE}?strat[${xi}][${yi}][0:${GT_ZCOUNT-1}],lithok[${xi}][${yi}][0:${GT_ZCOUNT-1}],z[0:${GT_ZCOUNT-1}]`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('GeoTOP API fout');
+    // OPeNDAP returns malformed JSON (missing commas between objects) — fix it
+    let rawText = await resp.text();
+    rawText = rawText.replace(/\}\s*\{/g, '},{');
+    const json = JSON.parse(rawText);
+
+    const zData = json.leaves.find(l => l.name === 'z').data;
+    const stratData = json.nodes.find(n => n.name === 'strat').leaves.find(l => l.name === 'strat').data[0][0];
+    const lithokData = json.nodes.find(n => n.name === 'lithok').leaves.find(l => l.name === 'lithok').data[0][0];
+
+    let mvIdx = GT_ZCOUNT - 1;
+    for (let i = GT_ZCOUNT - 1; i >= 0; i--) { if (lithokData[i] !== -127 && lithokData[i] !== 0) { mvIdx = i; break; } }
+    const mvNAP = zData[mvIdx] + GT_ZSTEP;
+
+    let deepIdx = 0;
+    for (let i = 0; i < GT_ZCOUNT; i++) { if (lithokData[i] !== -127 && lithokData[i] !== 0) { deepIdx = i; break; } }
+    const deepNAP = zData[deepIdx];
+
+    const layers = [];
+    for (let i = mvIdx; i >= deepIdx; i--) {
+      if (lithokData[i] === -127 || lithokData[i] === 0) continue;
+      layers.push({ topNAP: zData[i]+GT_ZSTEP, botNAP: zData[i], topMV: mvNAP-(zData[i]+GT_ZSTEP), botMV: mvNAP-zData[i], lithok: lithokData[i], strat: stratData[i] });
+    }
+
+    bsLog(`✔ ${layers.length} lagen (mv ${mvNAP.toFixed(1)} NAP, diepte ${(mvNAP-deepNAP).toFixed(1)} m)`);
+
+    bsData = { rdX: Math.round(rdX), rdY: Math.round(rdY), locationName: doc.weergavenaam, maaiveldNAP: mvNAP, deepestNAP: deepNAP, layers, maxDepthMV: mvNAP - deepNAP };
+
+    document.getElementById('pva-bs-info').style.display = 'block';
+    document.getElementById('pva-bs-info').innerHTML = `<strong>${doc.weergavenaam}</strong> · RD: ${Math.round(rdX)}, ${Math.round(rdY)} · Maaiveld: ${mvNAP.toFixed(2)} m NAP · Diepte: 0 – ${(mvNAP-deepNAP).toFixed(1)} m`;
+
+    renderPvaBoorstaat();
+    renderPvaBsLegend();
+  } catch (e) {
+    bsLog('❌ ' + e.message);
+    document.getElementById('pva-bs-area').innerHTML = `<div style="color:#c62828; padding:16px; text-align:center;">❌ ${e.message}</div>`;
+  }
+}
+
+function setBoorstaatView(v) {
+  bsView = v;
+  ['shallow','deep','both'].forEach(k => {
+    const b = document.getElementById('pva-bs-' + k);
+    b.style.border = k === v ? '2px solid #1e3a5f' : '';
+  });
+  renderPvaBoorstaat();
+}
+
+function renderPvaBoorstaat() {
+  if (!bsData) return;
+  const area = document.getElementById('pva-bs-area');
+  area.innerHTML = '';
+  if (bsView === 'shallow' || bsView === 'both') area.appendChild(drawBsCanvas(bsData, 0, 10));
+  if (bsView === 'deep' || bsView === 'both') area.appendChild(drawBsCanvas(bsData, 0, Math.ceil(bsData.maxDepthMV)));
+}
+
+function drawBsCanvas(data, depthFrom, depthTo) {
+  const MT = 50, MB = 20, ML = 65, BAR_W = 60, STRAT_W = 55, LABEL_W = 160;
+  const totalD = depthTo - depthFrom;
+  const pxM = totalD <= 15 ? 55 : totalD <= 50 ? 18 : totalD <= 100 ? 9 : 4;
+  const chartH = totalD * pxM;
+  const W = ML + BAR_W + 8 + STRAT_W + LABEL_W + 10;
+  const H = MT + chartH + MB;
+
+  const c = document.createElement('canvas');
+  c.width = W * 2; c.height = H * 2;
+  c.style.width = W + 'px'; c.style.height = H + 'px';
+  c.style.borderRadius = '6px'; c.style.border = '1px solid #e0e0e0';
+  const ctx = c.getContext('2d');
+  ctx.scale(2, 2);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+
+  // Title
+  ctx.fillStyle = '#1e3a5f'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(`${data.locationName}`, W / 2, 16);
+  ctx.font = '10px sans-serif'; ctx.fillStyle = '#666';
+  ctx.fillText(`RD: ${data.rdX}, ${data.rdY} | MV: ${data.maaiveldNAP.toFixed(2)} m NAP | ${depthFrom}–${depthTo} m`, W / 2, 30);
+
+  const x0 = ML, y0 = MT;
+  const sx = x0 + BAR_W + 8;
+
+  // Depth ticks
+  let ti = totalD <= 15 ? 1 : totalD <= 50 ? 5 : totalD <= 150 ? 10 : 25;
+  ctx.textAlign = 'right'; ctx.font = '9px sans-serif';
+  for (let d = depthFrom; d <= depthTo; d += ti) {
+    const y = y0 + (d - depthFrom) * pxM;
+    ctx.strokeStyle = '#ccc'; ctx.lineWidth = 0.4;
+    ctx.beginPath(); ctx.moveTo(x0 - 4, y); ctx.lineTo(x0 + BAR_W, y); ctx.stroke();
+    ctx.fillStyle = '#555'; ctx.fillText(d + 'm', x0 - 6, y + 3);
+    ctx.fillStyle = '#aaa'; ctx.font = '8px sans-serif';
+    ctx.fillText((data.maaiveldNAP - d).toFixed(1) + ' NAP', x0 - 6, y + 12);
+    ctx.font = '9px sans-serif';
+  }
+
+  // Column headers
+  ctx.fillStyle = '#1e3a5f'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('Lithoklasse', x0 + BAR_W / 2, y0 - 6);
+  ctx.fillText('Geol. eenh.', sx + STRAT_W / 2, y0 - 6);
+
+  // Lithok bars
+  const fl = data.layers.filter(l => l.botMV < depthTo && l.topMV >= depthFrom);
+  for (const l of fl) {
+    const top = Math.max(l.topMV, depthFrom), bot = Math.min(l.botMV, depthTo);
+    const yt = y0 + (top - depthFrom) * pxM, yb = y0 + (bot - depthFrom) * pxM;
+    ctx.fillStyle = (LITHOK[l.lithok] || {}).color || '#ddd';
+    ctx.fillRect(x0, yt, BAR_W, yb - yt);
+    ctx.strokeStyle = 'rgba(0,0,0,0.06)'; ctx.lineWidth = 0.2; ctx.strokeRect(x0, yt, BAR_W, yb - yt);
+  }
+
+  // Strat groups
+  let ps = null, st = 0; const sg = [];
+  for (const l of fl) {
+    if (l.strat !== ps) { if (ps !== null) sg.push({ s: ps, t: st, b: l.topMV }); ps = l.strat; st = l.topMV; }
+  }
+  if (ps !== null && fl.length) sg.push({ s: ps, t: st, b: fl[fl.length - 1].botMV });
+
+  const sc = ['#E3F2FD','#FFF3E0','#E8F5E9','#FCE4EC','#F3E5F5','#E0F2F1','#FFF9C4','#EFEBE9'];
+  const us = [...new Set(sg.map(g => g.s))];
+  for (const g of sg) {
+    const top = Math.max(g.t, depthFrom), bot = Math.min(g.b, depthTo);
+    const yt = y0 + (top - depthFrom) * pxM, h = (bot - top) * pxM;
+    ctx.fillStyle = sc[us.indexOf(g.s) % sc.length];
+    ctx.fillRect(sx, yt, STRAT_W, h);
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 0.4; ctx.strokeRect(sx, yt, STRAT_W, h);
+    if (h > 10) {
+      ctx.fillStyle = '#333'; ctx.font = '8px sans-serif'; ctx.textAlign = 'center';
+      const nm = STRAT_NAMES[g.s] || 'Code ' + g.s;
+      ctx.fillText(nm.length > 12 ? nm.substring(0, 11) + '…' : nm, sx + STRAT_W / 2, yt + h / 2 + 3);
+    }
+  }
+
+  // Litho labels right side (grouped)
+  let pl = null, lt = 0; const lg = [];
+  for (const l of fl) {
+    if (l.lithok !== pl) { if (pl !== null) lg.push({ k: pl, t: lt, b: l.topMV }); pl = l.lithok; lt = l.topMV; }
+  }
+  if (pl !== null && fl.length) lg.push({ k: pl, t: lt, b: fl[fl.length - 1].botMV });
+
+  const lx = sx + STRAT_W + 8;
+  ctx.textAlign = 'left'; ctx.font = '8px sans-serif';
+  for (const g of lg) {
+    const top = Math.max(g.t, depthFrom), bot = Math.min(g.b, depthTo);
+    const h = (bot - top) * pxM;
+    if (h < 8) continue;
+    const ym = y0 + ((top + bot) / 2 - depthFrom) * pxM;
+    ctx.fillStyle = '#444';
+    ctx.fillText(`${(LITHOK[g.k]||{}).name||'?'} (${top.toFixed(1)}–${bot.toFixed(1)}m)`, lx, ym + 3);
+  }
+
+  // Borders
+  ctx.strokeStyle = '#333'; ctx.lineWidth = 0.8;
+  ctx.strokeRect(x0, y0, BAR_W, chartH);
+  ctx.strokeRect(sx, y0, STRAT_W, chartH);
+
+  if (depthFrom === 0) {
+    ctx.fillStyle = '#2E7D32'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('▼ Maaiveld', x0, y0 - 12);
+  }
+
+  return c;
+}
+
+function renderPvaBsLegend() {
+  const el = document.getElementById('pva-bs-legend');
+  el.style.display = 'flex';
+  const used = new Set(bsData.layers.map(l => l.lithok));
+  el.innerHTML = '';
+  for (const [code, info] of Object.entries(LITHOK)) {
+    if (!used.has(parseInt(code))) continue;
+    el.innerHTML += `<span style="display:flex;align-items:center;gap:4px;"><span style="width:16px;height:10px;border-radius:2px;border:1px solid rgba(0,0,0,0.15);background:${info.color};display:inline-block;"></span>${info.name}</span>`;
+  }
+}

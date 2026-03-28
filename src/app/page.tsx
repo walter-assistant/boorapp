@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useRef } from 'react';
 import { supabase, loadUserData, saveUserData, saveAllUserData, DATA_KEYS } from '@/lib/supabase';
@@ -249,6 +249,7 @@ tr:hover { background: #eef3fa; }
 .offerte-amount { font-size: 18px; font-weight: 700; color: #1e3a5f; }
 .offerte-actions { display: flex; gap: 6px; margin-left: 12px; }
 @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
 `;
 
 // ============= HTML =============
@@ -277,6 +278,7 @@ const BOORAPP_HTML = `
     <div class="two-col">
       <div class="panel">
         <h2>Offerte Gegevens</h2>
+
         <div class="form-row">
           <div class="form-group">
             <label>Klantnaam</label>
@@ -290,6 +292,7 @@ const BOORAPP_HTML = `
             <input type="text" id="f-tav" placeholder="Contactpersoon">
           </div>
         </div>
+
         <div class="form-row">
           <div class="form-group">
             <label>Ons Kenmerk</label>
@@ -300,6 +303,7 @@ const BOORAPP_HTML = `
             <input type="date" id="f-datum">
           </div>
         </div>
+
         <div class="form-row full">
           <div class="form-group">
             <label>Betreft</label>
@@ -312,7 +316,9 @@ const BOORAPP_HTML = `
             </select>
           </div>
         </div>
+
         <h2 style="margin-top:20px">Technische Specificaties</h2>
+
         <div class="form-row">
           <div class="form-group">
             <label>Max. vermogen warmtepomp (KW)</label>
@@ -323,6 +329,7 @@ const BOORAPP_HTML = `
             <input type="number" id="f-factor" value="0.8" step="0.05" oninput="calc()">
           </div>
         </div>
+
         <div class="form-row">
           <div class="form-group">
             <label>Bodemzijdig vermogen (KW)</label>
@@ -333,6 +340,7 @@ const BOORAPP_HTML = `
             <input type="number" id="f-pompen" value="1" min="1" oninput="calc()">
           </div>
         </div>
+
         <div class="form-row">
           <div class="form-group">
             <label>Aantal boringen</label>
@@ -343,6 +351,7 @@ const BOORAPP_HTML = `
             <input type="number" id="f-meters" value="225" min="1" oninput="calc()">
           </div>
         </div>
+
         <div class="form-row">
           <div class="form-group">
             <label>Meters per boring</label>
@@ -356,10 +365,12 @@ const BOORAPP_HTML = `
             </select>
           </div>
         </div>
+
         <div class="form-row">
           <div class="form-group">
             <label>Luslengte (rollengte)</label>
-            <select id="f-luslengte" onchange="calc()"></select>
+            <select id="f-luslengte" onchange="calc()">
+            </select>
           </div>
           <div class="form-group">
             <label>Locatie boringen</label>
@@ -384,6 +395,7 @@ const BOORAPP_HTML = `
             </div>
           </div>
         </div>
+
         <div class="form-row">
           <div class="form-group">
             <label>Telefoonnummer klant</label>
@@ -454,6 +466,7 @@ const BOORAPP_HTML = `
   <!-- TAB: PLAN VAN AANPAK -->
   <div id="tab-pva" class="tab-content">
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+
       <!-- LINKER KOLOM -->
       <div>
         <div class="panel">
@@ -547,13 +560,27 @@ const BOORAPP_HTML = `
           <div class="form-row full">
             <div class="form-group">
               <label>Verwachte bodemopbouw (uit DinoLoket)</label>
-              <div style="display:flex;gap:8px;margin-bottom:6px;">
-                <button type="button" id="btn-dino-fetch" onclick="fetchDinoLoketData()" style="padding:8px 16px;background:#1565c0;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">🔍 Ophalen uit DINOloket</button>
-                <span id="dino-status" style="font-size:12px;color:#666;align-self:center;"></span>
-              </div>
-              <textarea id="pva-bodemopbouw" rows="10" style="width:100%;padding:8px 10px;border:1px solid #d0d5dd;border-radius:5px;font-size:13px;font-family:inherit;resize:vertical;min-height:120px;max-height:400px;overflow-y:auto;" placeholder="Klik op 'Ophalen uit DINOloket' of vul handmatig in:&#10;0-2m: Klei&#10;2-15m: Fijn zand&#10;15-40m: Klei (scheidende laag)&#10;40-225m: Grof zand"></textarea>
-              <textarea id="pva-boorstaat-diep" rows="10" style="width:100%;padding:8px 10px;border:1px solid #d0d5dd;border-radius:5px;font-size:13px;font-family:inherit;resize:vertical;margin-top:6px;display:none;min-height:120px;max-height:400px;overflow-y:auto;" placeholder="Diep profiel (tot 250m)"></textarea>
+              <textarea id="pva-bodemopbouw" rows="4" style="width:100%;padding:8px 10px;border:1px solid #d0d5dd;border-radius:5px;font-size:13px;font-family:inherit;resize:vertical;" placeholder="0-2m: Klei&#10;2-15m: Fijn zand&#10;15-40m: Klei (scheidende laag)&#10;40-225m: Grof zand"></textarea>
             </div>
+          </div>
+          <!-- Visuele Boorstaat GeoTOP -->
+          <div style="margin-top:12px; padding:12px 16px; background:#f0f7ff; border-radius:6px; border:1px solid #d0e3f7;">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+              <div>
+                <strong style="font-size:13px; color:#1e3a5f;">📊 Visuele Boorstaat (GeoTOP v1.6.1)</strong>
+                <div style="font-size:11px; color:#888; margin-top:2px;">Haalt bodemopbouw op via TNO/DINOloket op basis van het adres hierboven</div>
+              </div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="fetchBoorstaat()" style="font-size:12px; padding:6px 14px;">🔄 Boorstaat ophalen</button>
+                <button class="btn btn-secondary" onclick="setBoorstaatView('shallow')" id="pva-bs-shallow" style="font-size:11px; padding:5px 10px;">0–10m</button>
+                <button class="btn btn-secondary" onclick="setBoorstaatView('deep')" id="pva-bs-deep" style="font-size:11px; padding:5px 10px;">0–max</button>
+                <button class="btn btn-secondary" onclick="setBoorstaatView('both')" id="pva-bs-both" style="font-size:11px; padding:5px 10px; border:2px solid #1e3a5f;">Beide</button>
+              </div>
+            </div>
+            <div id="pva-bs-info" style="display:none; font-size:12px; color:#555; margin-bottom:8px;"></div>
+            <div id="pva-bs-log" style="display:none; font-size:11px; color:#666; font-family:monospace; margin-bottom:8px; max-height:80px; overflow-y:auto;"></div>
+            <div id="pva-bs-area" style="display:flex; gap:16px; flex-wrap:wrap; justify-content:center;"></div>
+            <div id="pva-bs-legend" style="display:none; display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:10px; font-size:11px;"></div>
           </div>
           <div class="form-row">
             <div class="form-group">
@@ -1036,4 +1063,5 @@ const BOORAPP_HTML = `
     </div>
   </div>
 </div>
+
 `;
