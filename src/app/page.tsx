@@ -472,7 +472,7 @@ const BOORAPP_HTML = `
         <div class="panel">
           <h2>Plan van Aanpak BRL2100 / BRL11000</h2>
           <div style="margin-bottom:10px; padding:8px 12px; background:#e3f2fd; border-radius:6px; font-size:12px; color:#1565c0;">
-            💡 Klik "🔄 Vul vanuit offerte" om data over te nemen. Alle 7 BRL-eisen + risico-analyse.
+            💡 Data wordt automatisch overgenomen uit de offerte. Alle 7 BRL-eisen + risico-analyse.
           </div>
           <div class="form-row">
             <div class="form-group"><label>Klantnaam</label><input type="text" id="pva-klant" placeholder="Klantnaam"></div>
@@ -1028,7 +1028,6 @@ const BOORAPP_HTML = `
 
         <div class="panel" style="margin-top:16px; text-align:center;">
           <div style="display:flex; gap:12px; justify-content:center;">
-            <button class="btn btn-primary" onclick="prefillPvaFromOfferte()">🔄 Vul vanuit offerte</button>
             <button class="btn btn-success" onclick="generatePvaPDF()">📄 Genereer PvA PDF</button>
           </div>
           <div style="margin-top:12px; font-size:11px; color:#888;">
