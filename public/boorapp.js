@@ -3,10 +3,19 @@
 // ============================================================
 async function uploadToDropbox(pdfDoc, filename, klant, projectnr, docType) {
   try {
+    console.log('Dropbox upload:', {klant, projectnr, docType, filename});
     var pdfBase64 = pdfDoc.output('datauristring').split(',')[1];
     var klantFolder = (klant || 'Zonder_klant').replace(/[^a-zA-Z0-9 _-]/g, '').trim();
     var projectFolder = (projectnr || 'Zonder_projectnummer').replace(/[^a-zA-Z0-9 _-]/g, '').trim();
-    var dropboxPath = '/Ground Research/' + klantFolder + '/' + projectFolder + '/' + docType + '/' + filename;
+    var folderPath = '/Ground Research/' + klantFolder + '/' + projectFolder + '/' + docType;
+    var dropboxPath = folderPath + '/' + filename;
+    // Eerst map aanmaken
+    await fetch('/api/dropbox/upload', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderPath: folderPath })
+    });
+    // Dan bestand uploaden
     var response = await fetch('/api/dropbox/upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -617,63 +626,21 @@ function downloadWKOPdf() {
   const filename = `WKO_Rapport_${(r.location?.address || r.address).replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
   pdf.save(filename);
 
-  // Klant en project ophalen: eerst uit offerte-formulier, dan uit opslag, dan vragen
-  var wkoKlant = ''; try { var sel = document.getElementById('f-klant'); if (sel && sel.selectedOptions[0]) wkoKlant = sel.selectedOptions[0].textContent || ''; } catch(e) {}
-  var wkoProjectNr = ''; try { wkoProjectNr = document.getElementById('f-projectnr')?.value || ''; } catch(e) {}
+  // Automatisch opslaan in Dropbox — klant en project uit offerte-formulier
+  var wkoKlant = '';
+  try {
+    var sel = document.getElementById('f-klant');
+    if (sel && sel.selectedOptions[0] && sel.value) wkoKlant = sel.selectedOptions[0].textContent.trim();
+  } catch(e) {}
+  var wkoProjectNr = '';
+  try { wkoProjectNr = (document.getElementById('f-projectnr')?.value || '').trim(); } catch(e) {}
 
-  // Toon opslaan-dialoog
-  showWKOSaveDialog(pdf, filename, wkoKlant, wkoProjectNr, r);
+  if (wkoKlant && wkoProjectNr) {
+    uploadToDropbox(pdf, filename, wkoKlant, wkoProjectNr, 'WKO_Rapport');
+  } else {
+    showDropboxNotification('\u26a0\ufe0f Dropbox: vul klant + projectnummer in bij Offerte tab om automatisch op te slaan', 'error');
+  }
 }
-
-function showWKOSaveDialog(pdf, filename, defaultKlant, defaultProject, report) {
-  var existing = document.getElementById('wko-save-dialog');
-  if (existing) existing.remove();
-
-  var klanten = getKlanten();
-  var klantOptions = '<option value="">-- Selecteer klant --</option>' + klanten.map(function(k){
-    var selected = k.bedrijf === defaultKlant ? ' selected' : '';
-    return '<option value="' + k.bedrijf + '"' + selected + '>' + k.bedrijf + '</option>';
-  }).join('');
-
-  var overlay = document.createElement('div');
-  overlay.id = 'wko-save-dialog';
-  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;';
-  overlay.innerHTML = '<div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,0.3)">' +
-    '<h3 style="margin:0 0 16px;color:#1e3a5f;font-size:16px">\u2601\ufe0f WKO Rapport opslaan</h3>' +
-    '<label style="font-size:12px;font-weight:600;color:#555">Klantnaam</label>' +
-    '<select id="wko-save-klant" style="width:100%;padding:8px;margin:4px 0 12px;border:1px solid #ccc;border-radius:6px;font-size:14px">' + klantOptions + '</select>' +
-    '<label style="font-size:12px;font-weight:600;color:#555">Projectnummer</label>' +
-    '<input id="wko-save-project" type="text" value="' + (defaultProject || '') + '" placeholder="bijv. 2024-045" style="width:100%;padding:8px;margin:4px 0 12px;border:1px solid #ccc;border-radius:6px;font-size:14px;box-sizing:border-box">' +
-    '<div style="display:flex;gap:8px;margin-top:8px">' +
-    '<button onclick="doWKODropboxSave()" style="flex:1;padding:10px;background:#2d7d46;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">\u2601\ufe0f Opslaan in Dropbox</button>' +
-    '<button onclick="document.getElementById(\'wko-save-dialog\').remove()" style="padding:10px 16px;background:#eee;color:#333;border:none;border-radius:8px;font-size:14px;cursor:pointer">Annuleren</button>' +
-    '</div></div>';
-  document.body.appendChild(overlay);
-
-  // Store pdf reference for the save function
-  window._wkoSavePdf = pdf;
-  window._wkoSaveFilename = filename;
-  window._wkoSaveReport = report;
-}
-
-function doWKODropboxSave() {
-  var klant = document.getElementById('wko-save-klant').value || '';
-  var project = document.getElementById('wko-save-project').value.trim() || 'onbekend';
-  var pdf = window._wkoSavePdf;
-  var filename = window._wkoSaveFilename;
-
-  if (!klant) { alert('Selecteer een klant'); return; }
-  if (!project || project === 'onbekend') { alert('Vul een projectnummer in'); return; }
-
-  uploadToDropbox(pdf, filename, klant, project, 'WKO_Rapport');
-  document.getElementById('wko-save-dialog').remove();
-
-  // Cleanup
-  window._wkoSavePdf = null;
-  window._wkoSaveFilename = null;
-  window._wkoSaveReport = null;
-}
-window.doWKODropboxSave = doWKODropboxSave;
 
 function updateLusOpties() {
   const diameter = parseInt(document.getElementById('f-diameter').value);
