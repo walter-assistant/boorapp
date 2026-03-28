@@ -632,8 +632,13 @@ function downloadWKOPdf() {
     var sel = document.getElementById('f-klant');
     if (sel && sel.selectedOptions[0] && sel.value) wkoKlant = sel.selectedOptions[0].textContent.trim();
   } catch(e) {}
-  var wkoProjectNr = '';
-  try { wkoProjectNr = (document.getElementById('f-projectnr')?.value || '').trim(); } catch(e) {}
+  // Projectmap: zelfde formaat als Offerte → kenmerk-locatie
+  var wkoKenmerk = '';
+  try { wkoKenmerk = (document.getElementById('f-kenmerk')?.value || '').trim(); } catch(e) {}
+  if (!wkoKenmerk) try { wkoKenmerk = (document.getElementById('pva-projectnr')?.value || '').trim(); } catch(e) {}
+  var wkoLocatie = '';
+  try { wkoLocatie = (document.getElementById('f-locatie')?.value || '').trim(); } catch(e) {}
+  var wkoProjectNr = ((wkoKenmerk || '') + (wkoLocatie ? '-' + wkoLocatie : '')).trim();
 
   if (wkoKlant && wkoProjectNr) {
     uploadToDropbox(pdf, filename, wkoKlant, wkoProjectNr, 'WKO_Rapport');
