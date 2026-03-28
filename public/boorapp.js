@@ -724,7 +724,6 @@ const COST_ITEMS = [
   { key: 'graafwerk', label: 'Graafwerk + kraan', detail: '' },
   { key: 'transport', label: 'Transport', detail: '' },
   { key: 'barogel', label: 'Barogel', detail: '', expandable: true },
-  { key: 'ezmud', label: 'EZ Mud', detail: '' },
   { key: 'olo', label: 'OLO melding', detail: '' },
 ];
 
