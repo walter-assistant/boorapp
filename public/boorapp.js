@@ -1331,152 +1331,283 @@ function generatePDF() {
   const doc = new jsPDF('p', 'mm', 'a4');
   const W = 210, M = 20;
   const pw = W - 2 * M;
+  
+  // Kleuren
+  const DARK_BLUE = [26, 35, 50];
+  const MEDIUM_BLUE = [30, 58, 95];
+  const ORANGE = [232, 115, 12];
+  const LIGHT_GRAY = [245, 247, 250];
 
-  function eurPdf(n) { return eur(n); }
+  function addFooter(pageNum) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    const footerText = '123Bodemenergie is onderdeel van Ground Research. Vrijheidweg 45. 1521 RP Wormerveer 088-1262910. KvK 37089931. NL48RABO0346687667';
+    doc.text(footerText, W/2, 290, { align: 'center' });
+  }
 
-  // ---- PAGE 1: AANBIEDINGSBRIEF ----
-  // Logo rechts bovenaan
-  try { doc.addImage(LOGO_123BE, 'JPEG', W - M - 55, 12, 55, 18); } catch(e) {}
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(20);
-  doc.text('Ground Research BV', M, 25);
+  function addHeader(title, withLogo = false) {
+    // Header banner
+    doc.setFillColor(...DARK_BLUE);
+    doc.rect(0, 0, W, 40, 'F');
+    
+    // Logo links bovenin
+    if (withLogo) {
+      try { doc.addImage(LOGO_123BE, 'JPEG', M, 10, 40, 13); } catch(e) {}
+    }
+    
+    // Title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(255, 255, 255);
+    doc.text(title, withLogo ? M + 50 : M, 25);
+    
+    // Reset text color
+    doc.setTextColor(0, 0, 0);
+    
+    return 50; // Return starting Y position for content
+  }
+
+  // ========== PAGINA 1: AANBIEDINGSBRIEF ==========
+  let y = addHeader('AANBIEDINGSBRIEF', true);
+  
+  // Klantgegevens links, kenmerk/datum rechts
+  y += 5;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  doc.text('Vrijheidweg 45, 1521RP Wormerveer', M, 32);
-
-  // Lijn
-  doc.setDrawColor(30, 58, 95);
-  doc.setLineWidth(0.5);
-  doc.line(M, 36, W - M, 36);
-
+  
   // Klantgegevens links
-  let y = 48;
-  doc.setFontSize(10);
-  if (d.klantNaam) { doc.text(d.klantNaam, M, y); y += 5; }
-  if (d.tav) { doc.text('T.a.v. ' + d.tav, M, y); y += 5; }
-  if (d.locatie) { doc.text(d.locatie, M, y); y += 5; }
-
+  let leftY = y;
+  if (d.klantNaam) { doc.text(d.klantNaam, M, leftY); leftY += 5; }
+  if (d.tav) { doc.text('T.a.v. ' + d.tav, M, leftY); leftY += 5; }
+  if (d.locatie) { doc.text(d.locatie, M, leftY); leftY += 5; }
+  
   // Kenmerk/datum rechts
   doc.setFontSize(9);
-  doc.text('Ons kenmerk: ' + (d.kenmerk || '-'), W - M, 48, { align: 'right' });
-  doc.text('Datum: ' + formatDate(d.datum), W - M, 54, { align: 'right' });
-
+  doc.text('Ons kenmerk: ' + (d.kenmerk || '-'), W - M, y, { align: 'right' });
+  doc.text('Datum: ' + formatDate(d.datum), W - M, y + 5, { align: 'right' });
+  
+  y = Math.max(leftY, y + 15);
+  
   // Betreft
-  y = Math.max(y, 64) + 6;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
+  doc.setFontSize(12);
   doc.text('Betreft: ' + d.betreft, M, y);
-
-  // Aanhef
   y += 12;
+  
+  // Aanhef
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.text('Geachte heer/mevrouw,', M, y);
-  y += 8;
-
+  y += 10;
+  
+  // Inleidende tekst
   const introText = 'Conform uw verzoek/aanvraag ontvangt u hierbij ons voorstel betreffende het plaatsen van een verticaal bodemwarmtewisselaar systeem voor een water/water warmtepomp.';
   const lines = doc.splitTextToSize(introText, pw);
   doc.text(lines, M, y);
-  y += lines.length * 5 + 8;
-
-  // Specificaties
+  y += lines.length * 5 + 15;
+  
+  // Specificaties in een nette tabel
   doc.setFont('helvetica', 'bold');
-  doc.text('Specificaties:', M, y); y += 6;
-  doc.setFont('helvetica', 'normal');
-  const specs = [
-    `Maximaal vermogen warmtepomp: ${d.vermogen} KW`,
-    `Bodemzijdig vermogen: ${d.bodemvermogen.toFixed(2)} KW`,
-    `Totaal boormeters: ${d.meters} m`,
-    `Meters per boring: ${d.mpb.toFixed(1)} m`,
-    `Aantal boringen: ${d.boringen}`,
-    `Diameter bodemwarmtewisselaar: ${d.diameter}mm`,
-    `Aantal pompen: ${d.pompen}`
-  ];
-  specs.forEach(s => { doc.text('•  ' + s, M + 4, y); y += 5.5; });
-
-  y += 10;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  const bedragTekst = `Het totaalbedrag van deze offerte bedraagt: ${eurPdf(d.total)} exclusief BTW`;
-  doc.text(bedragTekst, M, y);
-
-  y += 20;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.text('Met vriendelijke groet,', M, y); y += 6;
-  doc.text('Ground Research BV', M, y); y += 5;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Pim Groot', M, y);
-
-  // ---- PAGE 2: KOSTENSPECIFICATIE ----
-  doc.addPage();
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.text('Kostenspecificatie', M, 25);
-  doc.setDrawColor(30, 58, 95);
-  doc.line(M, 29, W - M, 29);
-
-  y = 38;
-  doc.setFontSize(10);
-
-  // Table header
-  doc.setFillColor(30, 58, 95);
-  doc.rect(M, y - 5, pw, 8, 'F');
-  doc.setTextColor(255);
-  doc.text('Omschrijving', M + 3, y);
-  doc.text('Bedrag', W - M - 3, y, { align: 'right' });
-  doc.setTextColor(0);
+  doc.setFontSize(11);
+  doc.text('SPECIFICATIES', M, y);
   y += 8;
-
+  
+  // Tabel header
+  doc.setFillColor(...MEDIUM_BLUE);
+  doc.rect(M, y - 4, pw, 8, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('OMSCHRIJVING', M + 3, y);
+  doc.text('WAARDE', W - M - 3, y, { align: 'right' });
+  doc.setTextColor(0, 0, 0);
+  y += 8;
+  
+  // Specificatie rijen
   doc.setFont('helvetica', 'normal');
-  const costLabels = {
-    boorkosten: 'Boorkosten', lussen: 'Prijs Lussen', grout: 'Grout',
-    gewichten: 'Gewichten', verdelerput: 'Verdelerput', aansluiten: 'Aansluiten bronnen',
-    glycol: 'Glycol', graafwerk: 'Graafwerk + kraan', transport: 'Transport',
-    barogel: 'Barogel', ezmud: 'EZ Mud', olo: 'OLO melding'
-  };
+  doc.setFontSize(9);
+  const specs = [
+    ['Maximaal vermogen warmtepomp', `${d.vermogen} KW`],
+    ['Bodemzijdig vermogen', `${d.bodemvermogen.toFixed(2)} KW`],
+    ['Totaal boormeters', `${d.meters} m`],
+    ['Meters per boring', `${d.mpb.toFixed(1)} m`],
+    ['Aantal boringen', `${d.boringen}`],
+    ['Diameter bodemwarmtewisselaar', `${d.diameter}mm`],
+    ['Aantal pompen', `${d.pompen}`]
+  ];
+  
+  let specEven = false;
+  specs.forEach(spec => {
+    if (specEven) { 
+      doc.setFillColor(...LIGHT_GRAY); 
+      doc.rect(M, y - 3.5, pw, 6, 'F'); 
+    }
+    doc.text(spec[0], M + 3, y);
+    doc.text(spec[1], W - M - 3, y, { align: 'right' });
+    y += 6;
+    specEven = !specEven;
+  });
+  
+  y += 15;
+  
+  // Totaalbedrag (groot en oranje accent)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(...ORANGE);
+  const bedragTekst = `Het totaalbedrag van deze offerte bedraagt: ${eur(d.total)} exclusief BTW`;
+  doc.text(bedragTekst, M, y);
+  doc.setTextColor(0, 0, 0);
+  y += 20;
+  
+  // Ondertekening links
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text('Met vriendelijke groet,', M, y);
+  y += 6;
+  doc.text('123bodemenergie / P. Groot, bedrijfsleider', M, y);
+  y += 4;
+  doc.text('Tel.: 088-1262910 / Mob: 06 47 326 322', M, y);
+  
+  // Akkoordblok rechts
+  const akkoordX = W - M - 80;
+  const akkoordY = y - 25;
+  doc.setDrawColor(...MEDIUM_BLUE);
+  doc.setLineWidth(1);
+  doc.rect(akkoordX, akkoordY, 80, 35);
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Akkoord voor uitvoering:', akkoordX + 3, akkoordY + 8);
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(d.klantNaam || 'Naam:', akkoordX + 3, akkoordY + 16);
+  
+  // Handtekening lijn
+  doc.setLineWidth(0.5);
+  doc.line(akkoordX + 3, akkoordY + 22, akkoordX + 77, akkoordY + 22);
+  doc.text('Handtekening', akkoordX + 3, akkoordY + 26);
+  
+  // Datum lijn
+  doc.line(akkoordX + 3, akkoordY + 32, akkoordX + 77, akkoordY + 32);
+  doc.text('Datum', akkoordX + 3, akkoordY + 36);
+  
+  addFooter(1);
 
+  // ========== PAGINA 2: KOSTENSPECIFICATIE ==========
+  doc.addPage();
+  y = addHeader('KOSTENSPECIFICATIE');
+  
+  // Tabel header
+  doc.setFillColor(...MEDIUM_BLUE);
+  doc.rect(M, y, pw, 10, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('OMSCHRIJVING', M + 4, y + 7);
+  doc.text('BEDRAG', W - M - 4, y + 7, { align: 'right' });
+  doc.setTextColor(0, 0, 0);
+  y += 12;
+  
+  // Kostentabel met zebra-stripes
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  const costLabels = {
+    boorkosten: 'Boorkosten', 
+    lussen: 'Prijs Lussen', 
+    grout: 'Grout',
+    gewichten: 'Gewichten', 
+    verdelerput: 'Verdelerput', 
+    aansluiten: 'Aansluiten bronnen',
+    glycol: 'Glycol', 
+    graafwerk: 'Graafwerk + kraan', 
+    transport: 'Transport',
+    barogel: 'Barogel', 
+    ezmud: 'EZ Mud', 
+    olo: 'OLO melding'
+  };
+  
   let even = false;
   COST_ITEMS.forEach(item => {
-    if (even) { doc.setFillColor(245, 247, 250); doc.rect(M, y - 4.5, pw, 7, 'F'); }
-    doc.text(costLabels[item.key] || item.key, M + 3, y);
-    doc.text(eurPdf(d.costs[item.key] || 0), W - M - 3, y, { align: 'right' });
-    y += 7;
+    if (even) { 
+      doc.setFillColor(...LIGHT_GRAY); 
+      doc.rect(M, y - 3, pw, 8, 'F'); 
+    }
+    doc.text(costLabels[item.key] || item.key, M + 4, y + 2);
+    doc.text(eur(d.costs[item.key] || 0), W - M - 4, y + 2, { align: 'right' });
+    y += 8;
     even = !even;
   });
+  
   // Custom artikelen
   if (d.customArtikelen && d.customArtikelen.length) {
     d.customArtikelen.forEach(art => {
-      if (even) { doc.setFillColor(245, 247, 250); doc.rect(M, y - 4.5, pw, 7, 'F'); }
-      doc.text(art.naam || 'Extra artikel', M + 3, y);
-      doc.text(eurPdf(art.bedrag), W - M - 3, y, { align: 'right' });
-      y += 7;
+      if (even) { 
+        doc.setFillColor(...LIGHT_GRAY); 
+        doc.rect(M, y - 3, pw, 8, 'F'); 
+      }
+      doc.text(art.naam || 'Extra artikel', M + 4, y + 2);
+      doc.text(eur(art.bedrag), W - M - 4, y + 2, { align: 'right' });
+      y += 8;
       even = !even;
     });
   }
-
-  // Total
-  y += 3;
-  doc.setDrawColor(30, 58, 95);
-  doc.setLineWidth(0.8);
+  
+  // Totaalregel
+  y += 5;
+  doc.setDrawColor(...MEDIUM_BLUE);
+  doc.setLineWidth(1);
   doc.line(M, y, W - M, y);
-  y += 7;
+  y += 10;
+  
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.text('TOTAAL EXCL. BTW', M + 3, y);
-  doc.text(eurPdf(d.total), W - M - 3, y, { align: 'right' });
-
-  // ---- PAGE 3: VOORWAARDEN ----
-  doc.addPage();
+  doc.setFillColor(...LIGHT_GRAY);
+  doc.rect(M, y - 5, pw, 10, 'F');
+  doc.text('TOTAAL EXCL. BTW', M + 4, y + 2);
+  doc.setTextColor(...ORANGE);
+  doc.text(eur(d.total), W - M - 4, y + 2, { align: 'right' });
+  doc.setTextColor(0, 0, 0);
+  y += 15;
+  
+  // "Wat krijgt u voor deze kosten:" sectie
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.text('Uitgangspunten & Voorwaarden', M, 25);
-  doc.setDrawColor(30, 58, 95);
-  doc.line(M, 29, W - M, 29);
+  doc.setFontSize(12);
+  doc.text('Wat krijgt u voor deze kosten:', M, y);
+  y += 8;
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  const watKrijgtU = [
+    'Plaatsen warmtewisselaar tot afgesproken diepte',
+    'Versleping naar binnen tot 20cm boven vloerpeil max 20m',
+    'Oplevering met puntstuk',
+    'Lussen zijn gevuld met water/glycol mix 70/30%',
+    'Lussen zijn afgeperst',
+    'Opleverrapport met garantie bewijs',
+    'Tekening met XY coördinaten'
+  ];
+  
+  watKrijgtU.forEach(item => {
+    doc.text('•  ' + item, M + 4, y);
+    y += 6;
+  });
+  
+  addFooter(2);
 
-  y = 40;
-  doc.setFontSize(11);
-  doc.text('Uitgangspunten', M, y); y += 7;
+  // ========== PAGINA 3: UITGANGSPUNTEN ==========
+  doc.addPage();
+  y = addHeader('UITGANGSPUNTEN & VOORWAARDEN');
+  
+  // Uitgangspunten sectie
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...MEDIUM_BLUE);
+  doc.text('Uitgangspunten aangeleverd door de klant', M, y);
+  doc.setTextColor(0, 0, 0);
+  y += 10;
+  
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   const uitgangspunten = [
@@ -1486,15 +1617,96 @@ function generatePDF() {
     `Totaal boormeters: ${d.meters} m in ${d.boringen} boring(en)`,
     `Bevoegd gezag: ${d.bevoegd}`
   ];
-  uitgangspunten.forEach(t => { doc.text('•  ' + t, M + 4, y); y += 5.5; });
-
+  
+  uitgangspunten.forEach(item => {
+    doc.text('•  ' + item, M + 4, y);
+    y += 6;
+  });
   y += 10;
+  
+  // Opdrachtgever verzorgt sectie
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text('Algemene Voorwaarden', M, y); y += 8;
+  doc.setFontSize(12);
+  doc.setTextColor(...MEDIUM_BLUE);
+  doc.text('Opdrachtgever verzorgt de volgende punten:', M, y);
+  doc.setTextColor(0, 0, 0);
+  y += 10;
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  const opdrachtgeverVerzorgt = [
+    'Toegang tot de locatie',
+    'Wateraansluiting met minimaal 3M³ per uur',
+    'Voldoende werkruimte voor machines en bussen en eventuele vergunningen hiervoor',
+    'Doorvoeren of gaten door funderingen',
+    'Aanleveren van een SPF verklaring om de OLO melding te kunnen doen',
+    'Verwijderen van straatwerk, planten, bomen of andere belemmeringen voor het boren'
+  ];
+  
+  opdrachtgeverVerzorgt.forEach(item => {
+    doc.text('•  ' + item, M + 4, y);
+    y += 6;
+  });
+  y += 10;
+  
+  // Niet opgenomen sectie
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...MEDIUM_BLUE);
+  doc.text('Niet opgenomen in deze offerte:', M, y);
+  doc.setTextColor(0, 0, 0);
+  y += 10;
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  const nietOpgenomen = [
+    'Gebruik van rijplaten',
+    'Parkeerkosten',
+    'Wegafzettingen'
+  ];
+  
+  nietOpgenomen.forEach(item => {
+    doc.text('•  ' + item, M + 4, y);
+    y += 6;
+  });
+  y += 10;
+  
+  // Waar moet u rekening mee houden sectie
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...MEDIUM_BLUE);
+  doc.text('Waar moet u rekening mee houden:', M, y);
+  doc.setTextColor(0, 0, 0);
+  y += 10;
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  
+  const rekeningMeeHouden1 = 'Wij mogen de grond die tijdens het boren vrijkomt niet meenemen, deze blijft achter op locatie. Het is wijs om een grondcontainer te bestellen, dit kan bij GP Groot in Heiloo. Voor de grootte van de container kan u altijd even contact met ons opnemen.';
+  let textLines = doc.splitTextToSize(rekeningMeeHouden1, pw - 8);
+  doc.text(textLines, M + 4, y);
+  y += textLines.length * 5 + 8;
+  
+  const rekeningMeeHouden2 = 'Boren tot grote diepte is niet niks, wij komen met groot materieel. Wij zullen er alles aan doen om dit zo netjes mogelijk te doen. Houd er rekening mee dat de tuin, oprit of bouwkavel behoorlijk geroerd zal zijn na afloop.';
+  textLines = doc.splitTextToSize(rekeningMeeHouden2, pw - 8);
+  doc.text(textLines, M + 4, y);
+  
+  addFooter(3);
+
+  // ========== PAGINA 4: ALGEMENE VOORWAARDEN + FACTURERING ==========
+  doc.addPage();
+  y = addHeader('ALGEMENE VOORWAARDEN & FACTURERING');
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...MEDIUM_BLUE);
+  doc.text('Algemene Voorwaarden', M, y);
+  doc.setTextColor(0, 0, 0);
+  y += 10;
+  
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-
+  
   const voorwaarden = [
     'Meerwerk wordt uitsluitend uitgevoerd na overleg en toestemming van de opdrachtgever.',
     'Kosten van vergunningen en leges zijn niet inbegrepen en worden apart verrekend.',
@@ -1504,15 +1716,54 @@ function generatePDF() {
     'Schade aan kabels en/of leidingen welke niet of onjuist geregistreerd staan bij het kadaster zijn niet verhaalbaar op Ground Research BV.',
     'Aansprakelijkheid is te allen tijde gemaximeerd tot het bedrag van de opdracht.',
     'Werkzaamheden worden uitgevoerd onder BRL2000/BRL2100/BRL11000 certificaat.',
-    'Scheidende lagen worden afgedicht volgens de richtlijnen van BRL2100.'
+    'Scheidende lagen worden afgedicht volgens de richtlijnen van BRL2100.',
+    'Onafhankelijkheid moet ten alle tijden zijn geborgd. Ground Research keurt dus geen eigen grond (zie BRL 2000, BRL 2100 of BRL 11000 zie Functie scheiding).',
+    'De projectleider Ground Research beoordeelt alleen of de aangeleverde gegevens voldoende zijn om de werkzaamheden conform de BRL eis uit te voeren.',
+    'Garantie op ondergronds systeem 10 jaar. Prestatie garantie op bodemwisselaar van 25 jaar.',
+    'Voor klachten t.o.v. van BRL werkzaamheden kan u terecht bij Ground Research BV.'
   ];
-
-  voorwaarden.forEach(v => {
-    const vlines = doc.splitTextToSize('•  ' + v, pw - 8);
+  
+  let counter = 1;
+  voorwaarden.forEach(voorwaarde => {
+    const vlines = doc.splitTextToSize(`${counter}. ${voorwaarde}`, pw - 8);
     doc.text(vlines, M + 4, y);
-    y += vlines.length * 4.5 + 2;
-    if (y > 270) { doc.addPage(); y = 25; }
+    y += vlines.length * 4 + 2;
+    counter++;
+    
+    if (y > 220) {
+      doc.addPage();
+      y = 30;
+    }
   });
+  
+  y += 15;
+  
+  // Facturering sectie
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...MEDIUM_BLUE);
+  doc.text('Facturering', M, y);
+  doc.setTextColor(0, 0, 0);
+  y += 10;
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  
+  doc.text('De kosten zullen volgens onderstaand schema worden verrekend:', M, y);
+  y += 8;
+  
+  doc.text('•  50% van de totale kosten na ontvangst van de opdrachtbevestiging;', M + 4, y);
+  y += 6;
+  doc.text('•  50% na oplevering werk.', M + 4, y);
+  y += 10;
+  
+  doc.text('Het factuurbedrag dient binnen 30 dagen op onze bankrekening te zijn overgemaakt.', M, y);
+  y += 6;
+  doc.text('Alle vermelde bedragen zijn exclusief BTW.', M, y);
+  y += 6;
+  doc.text('Dit voorstel geldt tot drie maanden na dato.', M, y);
+  
+  addFooter(4);
 
   // Save/download
   const filename = `Offerte_${d.kenmerk || 'draft'}_${d.klantNaam || 'klant'}.pdf`.replace(/\s+/g, '_');
