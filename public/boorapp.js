@@ -1203,6 +1203,7 @@ function gatherOfferteData() {
   return {
     klantId,
     klantNaam: klant ? klant.bedrijf : document.getElementById('f-klant').selectedOptions[0]?.textContent || '',
+    klantAdres: klant ? klant.adres : '',
     tav: document.getElementById('f-tav').value,
     kenmerk: document.getElementById('f-kenmerk').value,
     datum: document.getElementById('f-datum').value,
@@ -1412,7 +1413,7 @@ function generatePDF() {
   let leftY = y;
   if (d.klantNaam) { doc.text(d.klantNaam, M, leftY); leftY += 5; }
   if (d.tav) { doc.text('T.a.v. ' + d.tav, M, leftY); leftY += 5; }
-  if (d.locatie) { doc.text(d.locatie, M, leftY); leftY += 5; }
+  if (d.klantAdres) { doc.text(d.klantAdres, M, leftY); leftY += 5; }
   
   // Kenmerk/datum rechts
   doc.setFontSize(9);
@@ -1460,6 +1461,7 @@ function generatePDF() {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   const specs = [
+    ['Locatie bodemenergiesysteem', d.locatie || '-'],
     ['Maximaal vermogen warmtepomp', `${d.vermogen} KW`],
     ['Bodemzijdig vermogen', `${d.bodemvermogen.toFixed(2)} KW`],
     ['Totaal boormeters', `${d.meters} m`],
@@ -1501,29 +1503,31 @@ function generatePDF() {
   y += 4;
   doc.text('Tel.: 088-1262910 / Mob: 06 47 326 322', M, y);
   
-  // Akkoordblok rechts
-  const akkoordX = W - M - 80;
+  // Akkoordblok rechts — goed uitgelijnd naast ondertekening
+  const akkoordW = 85;
+  const akkoordH = 50;
+  const akkoordX = W - M - akkoordW;
   const akkoordY = y - 25;
   doc.setDrawColor(...MEDIUM_BLUE);
-  doc.setLineWidth(1);
-  doc.rect(akkoordX, akkoordY, 80, 35);
+  doc.setLineWidth(0.8);
+  doc.rect(akkoordX, akkoordY, akkoordW, akkoordH);
   
-  doc.setFont('helvetica', 'bold');
+  doc.setFont('helvetica', 'bolditalic');
   doc.setFontSize(10);
-  doc.text('Akkoord voor uitvoering:', akkoordX + 3, akkoordY + 8);
+  doc.text('Akkoord voor uitvoering:', akkoordX + 4, akkoordY + 8);
   
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text(d.klantNaam || 'Naam:', akkoordX + 3, akkoordY + 16);
+  doc.text(d.klantNaam || '', akkoordX + 4, akkoordY + 16);
   
   // Handtekening lijn
-  doc.setLineWidth(0.5);
-  doc.line(akkoordX + 3, akkoordY + 22, akkoordX + 77, akkoordY + 22);
-  doc.text('Handtekening', akkoordX + 3, akkoordY + 26);
+  doc.setLineWidth(0.3);
+  doc.line(akkoordX + 4, akkoordY + 26, akkoordX + akkoordW - 4, akkoordY + 26);
+  doc.text('Handtekening', akkoordX + 4, akkoordY + 31);
   
   // Datum lijn
-  doc.line(akkoordX + 3, akkoordY + 32, akkoordX + 77, akkoordY + 32);
-  doc.text('Datum', akkoordX + 3, akkoordY + 36);
+  doc.line(akkoordX + 4, akkoordY + 40, akkoordX + akkoordW - 4, akkoordY + 40);
+  doc.text('Datum', akkoordX + 4, akkoordY + 45);
   
   addFooter(1);
 
