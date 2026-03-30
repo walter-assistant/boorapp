@@ -1494,20 +1494,29 @@ function generatePDF() {
   doc.setTextColor(0, 0, 0);
   y += 20;
   
+  // Check of er genoeg ruimte is voor ondertekening + akkoordblok (minimaal 65mm nodig)
+  const H = doc.internal.pageSize.getHeight();
+  if (y + 65 > H - 20) {
+    addFooter(doc.internal.getCurrentPageInfo().pageNumber);
+    doc.addPage();
+    y = addHeader('');
+  }
+  
+  // Startpunt voor ondertekening + akkoordblok
+  const signY = y;
+  
   // Ondertekening links
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  doc.text('Met vriendelijke groet,', M, y);
-  y += 6;
-  doc.text('123bodemenergie / P. Groot, bedrijfsleider', M, y);
-  y += 4;
-  doc.text('Tel.: 088-1262910 / Mob: 06 47 326 322', M, y);
+  doc.text('Met vriendelijke groet,', M, signY);
+  doc.text('123bodemenergie / P. Groot, bedrijfsleider', M, signY + 8);
+  doc.text('Tel.: 088-1262910 / Mob: 06 47 326 322', M, signY + 14);
   
-  // Akkoordblok rechts — goed uitgelijnd naast ondertekening
+  // Akkoordblok rechts — uitgelijnd met ondertekening
   const akkoordW = 85;
   const akkoordH = 50;
   const akkoordX = W - M - akkoordW;
-  const akkoordY = y - 25;
+  const akkoordY = signY - 4;
   doc.setDrawColor(...MEDIUM_BLUE);
   doc.setLineWidth(0.8);
   doc.rect(akkoordX, akkoordY, akkoordW, akkoordH);
@@ -1528,6 +1537,8 @@ function generatePDF() {
   // Datum lijn
   doc.line(akkoordX + 4, akkoordY + 40, akkoordX + akkoordW - 4, akkoordY + 40);
   doc.text('Datum', akkoordX + 4, akkoordY + 45);
+  
+  y = akkoordY + akkoordH + 5;
   
   addFooter(1);
 
