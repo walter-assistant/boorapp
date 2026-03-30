@@ -96,9 +96,21 @@ const DEFAULT_KLANTEN = [
   { id: 46, bedrijf: 'VAME BV', contact: '', telefoon: '', adres: '', cert: '' }
 ];
 
+const KLANTEN_VERSION = 2; // Bump this to force update default klanten list
 function getKlanten() {
   let k = localStorage.getItem('gr_klanten');
-  if (!k) { localStorage.setItem('gr_klanten', JSON.stringify(DEFAULT_KLANTEN)); return [...DEFAULT_KLANTEN]; }
+  const v = parseInt(localStorage.getItem('gr_klanten_version') || '0');
+  if (!k || v < KLANTEN_VERSION) {
+    // Merge: keep existing custom klanten (id > max default), replace defaults
+    const maxDefaultId = Math.max(...DEFAULT_KLANTEN.map(x => x.id));
+    let existing = [];
+    try { existing = JSON.parse(k) || []; } catch(e) {}
+    const custom = existing.filter(x => x.id > maxDefaultId);
+    const merged = [...DEFAULT_KLANTEN, ...custom];
+    localStorage.setItem('gr_klanten', JSON.stringify(merged));
+    localStorage.setItem('gr_klanten_version', String(KLANTEN_VERSION));
+    return [...merged];
+  }
   return JSON.parse(k);
 }
 function saveKlanten(arr) { localStorage.setItem('gr_klanten', JSON.stringify(arr)); }
