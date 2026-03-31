@@ -1167,6 +1167,32 @@ const BOORAPP_HTML = `
           </div>
         </div>
 
+        <div class="panel" style="margin-top:16px;">
+          <h3 style="color:#1e3a5f; margin:0 0 12px; font-size:14px;">📸 Foto's</h3>
+          <div id="opl-foto-drop" ondrop="handleFotoDrop(event)" ondragover="event.preventDefault(); this.style.borderColor='#1e3a5f'; this.style.background='#e3f2fd';" ondragleave="this.style.borderColor='#d0d5dd'; this.style.background='#f8f9fb';"
+            style="border:2px dashed #d0d5dd; border-radius:8px; padding:24px; text-align:center; cursor:pointer; background:#f8f9fb; transition:all 0.2s;"
+            onclick="document.getElementById('opl-foto-input').click()">
+            <div style="font-size:28px; margin-bottom:6px;">📷</div>
+            <div style="font-size:13px; color:#666;">Sleep foto's hierheen of klik om te selecteren</div>
+            <div style="font-size:11px; color:#999; margin-top:4px;">JPG/PNG — worden toegevoegd aan de PDF</div>
+            <input type="file" id="opl-foto-input" multiple accept="image/*" onchange="handleFotoSelect(event)" style="display:none;">
+          </div>
+          <div id="opl-foto-preview" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;"></div>
+        </div>
+
+        <div class="panel" style="margin-top:16px;">
+          <h3 style="color:#1e3a5f; margin:0 0 12px; font-size:14px;">🗺️ Boortekening</h3>
+          <div id="opl-tekening-drop" ondrop="handleTekeningDrop(event)" ondragover="event.preventDefault(); this.style.borderColor='#1e3a5f'; this.style.background='#e3f2fd';" ondragleave="this.style.borderColor='#d0d5dd'; this.style.background='#f8f9fb';"
+            style="border:2px dashed #d0d5dd; border-radius:8px; padding:24px; text-align:center; cursor:pointer; background:#f8f9fb; transition:all 0.2s;"
+            onclick="document.getElementById('opl-tekening-input').click()">
+            <div style="font-size:28px; margin-bottom:6px;">📐</div>
+            <div style="font-size:13px; color:#666;">Sleep boortekening/kaart hierheen of klik om te selecteren</div>
+            <div style="font-size:11px; color:#999; margin-top:4px;">JPG/PNG — uit Boorpunt of eigen tekening</div>
+            <input type="file" id="opl-tekening-input" accept="image/*" onchange="handleTekeningSelect(event)" style="display:none;">
+          </div>
+          <div id="opl-tekening-preview" style="margin-top:10px;"></div>
+        </div>
+
         <div class="btn-group" style="margin-top:16px;">
           <button class="btn btn-success" onclick="generateOpleverPDF()">📄 Opleverrapport PDF</button>
           <button class="btn btn-primary" onclick="copyOfferteToOplever()">📋 Overnemen uit offerte</button>

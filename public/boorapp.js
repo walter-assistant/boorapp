@@ -2809,6 +2809,115 @@ function copyOfferteToOplever() {
   alert('Gegevens overgenomen uit offerte/PvA!');
 }
 
+// ============================================================
+// FOTO'S & BOORTEKENING
+// ============================================================
+let oplFotos = [];  // array of { dataUrl, name }
+let oplTekening = null;  // { dataUrl, name }
+
+function readImageFile(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      // Resize if needed (max 1200px wide to keep PDF size reasonable)
+      const img = new Image();
+      img.onload = () => {
+        const maxW = 1200;
+        let w = img.width, h = img.height;
+        if (w > maxW) { h = h * maxW / w; w = maxW; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve({ dataUrl: canvas.toDataURL('image/jpeg', 0.85), name: file.name, w, h });
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleFotoDrop(e) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = '#d0d5dd';
+  e.currentTarget.style.background = '#f8f9fb';
+  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+  for (const f of files) {
+    const img = await readImageFile(f);
+    oplFotos.push(img);
+  }
+  renderFotoPreview();
+}
+
+async function handleFotoSelect(e) {
+  const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
+  for (const f of files) {
+    const img = await readImageFile(f);
+    oplFotos.push(img);
+  }
+  renderFotoPreview();
+  e.target.value = '';  // reset zodat je dezelfde file opnieuw kunt selecteren
+}
+
+function removeFoto(idx) {
+  oplFotos.splice(idx, 1);
+  renderFotoPreview();
+}
+
+function renderFotoPreview() {
+  const container = document.getElementById('opl-foto-preview');
+  container.innerHTML = '';
+  oplFotos.forEach((foto, i) => {
+    const div = document.createElement('div');
+    div.style.cssText = 'position:relative; display:inline-block;';
+    div.innerHTML = '<img src="' + foto.dataUrl + '" style="width:80px; height:60px; object-fit:cover; border-radius:4px; border:1px solid #ddd;">' +
+      '<span onclick="removeFoto(' + i + ')" style="position:absolute; top:-6px; right:-6px; background:#c62828; color:white; border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:12px; cursor:pointer; font-weight:bold;">\u00D7</span>' +
+      '<div style="font-size:9px; color:#888; max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + foto.name + '</div>';
+    container.appendChild(div);
+  });
+  if (oplFotos.length > 0) {
+    const count = document.createElement('div');
+    count.style.cssText = 'font-size:11px; color:#2e7d32; margin-top:4px; width:100%;';
+    count.textContent = oplFotos.length + ' foto' + (oplFotos.length > 1 ? "'s" : '') + ' geselecteerd';
+    container.appendChild(count);
+  }
+}
+
+async function handleTekeningDrop(e) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = '#d0d5dd';
+  e.currentTarget.style.background = '#f8f9fb';
+  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+  if (files.length > 0) {
+    oplTekening = await readImageFile(files[0]);
+    renderTekeningPreview();
+  }
+}
+
+async function handleTekeningSelect(e) {
+  const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
+  if (files.length > 0) {
+    oplTekening = await readImageFile(files[0]);
+    renderTekeningPreview();
+  }
+  e.target.value = '';
+}
+
+function removeTekening() {
+  oplTekening = null;
+  renderTekeningPreview();
+}
+
+function renderTekeningPreview() {
+  const container = document.getElementById('opl-tekening-preview');
+  if (!oplTekening) { container.innerHTML = ''; return; }
+  container.innerHTML = '<div style="position:relative; display:inline-block;">' +
+    '<img src="' + oplTekening.dataUrl + '" style="max-width:100%; max-height:200px; border-radius:6px; border:1px solid #ddd;">' +
+    '<span onclick="removeTekening()" style="position:absolute; top:-6px; right:-6px; background:#c62828; color:white; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:14px; cursor:pointer; font-weight:bold;">\u00D7</span>' +
+    '<div style="font-size:11px; color:#2e7d32; margin-top:4px;">\u2705 ' + oplTekening.name + '</div>' +
+    '</div>';
+}
+
 function changeBronnen(delta) {
   const el = document.getElementById('opl-bronnen');
   const n = Math.max(1, Math.min(50, (parseInt(el.value) || 1) + delta));
@@ -2981,6 +3090,9 @@ function generateOpleverPDF() {
   bulletLine('Garantiecertificaat');
   bulletLine('Afpersrapport');
   bulletLine('Opleverrapportage');
+  if (oplTekening) bulletLine('Boortekening met co\u00F6rdinaten');
+  if (oplFotos.length > 0) bulletLine("Foto's (" + oplFotos.length + ')');
+
 
   // ============================================================
   // PAGINA 2: GARANTIECERTIFICAAT
@@ -3151,6 +3263,75 @@ function generateOpleverPDF() {
     y += 5;
     pdf.setDrawColor(220, 220, 220); pdf.setLineWidth(0.15);
     pdf.line(M, y - 2, M + CW, y - 2);
+  }
+
+  // ===================== BOORTEKENING =====================
+  if (oplTekening) {
+    pdf.addPage(); y = 20;
+    pdf.setFillColor(...BLAUW); pdf.rect(0, 0, W, 28, 'F');
+    pdf.setFontSize(16); pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold');
+    pdf.text('Boortekening met co\u00F6rdinaten', M, 14);
+    pdf.setFontSize(9); pdf.setFont('helvetica', 'normal');
+    pdf.text(p.locatie || '', M, 22);
+    y = 36;
+
+    // Fit image to page
+    const maxImgW = CW;
+    const maxImgH = 240;
+    const ratio = Math.min(maxImgW / oplTekening.w, maxImgH / oplTekening.h);
+    const imgW = oplTekening.w * ratio;
+    const imgH = oplTekening.h * ratio;
+    try {
+      pdf.addImage(oplTekening.dataUrl, 'JPEG', M + (CW - imgW) / 2, y, imgW, imgH);
+    } catch(e) { console.error('Boortekening error:', e); }
+    y += imgH + 6;
+
+    // NO DIG ZONE waarschuwing
+    if (y + 12 < 275) {
+      pdf.setFillColor(255, 248, 225); pdf.rect(M, y, CW, 10, 'F');
+      pdf.setDrawColor(230, 160, 0); pdf.setLineWidth(0.6); pdf.line(M, y, M, y + 10);
+      pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(180, 100, 0);
+      pdf.text('\u26A0  NO DIG ZONE \u2014 In de aangegeven zone mogen geen graafwerkzaamheden plaatsvinden.', M + 4, y + 6);
+    }
+  }
+
+  // ===================== FOTO'S =====================
+  if (oplFotos.length > 0) {
+    pdf.addPage(); y = 20;
+    pdf.setFillColor(...BLAUW); pdf.rect(0, 0, W, 28, 'F');
+    pdf.setFontSize(16); pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold');
+    pdf.text("Foto's", M, 14);
+    pdf.setFontSize(9); pdf.setFont('helvetica', 'normal');
+    pdf.text(p.locatie + '  |  ' + (p.datum ? formatDate(p.datum) : ''), M, 22);
+    y = 36;
+
+    // Place photos in 2-column grid
+    const fotoW = (CW - 8) / 2;
+    const fotoH = fotoW * 0.75;  // 4:3 aspect
+    let col = 0;
+
+    for (let i = 0; i < oplFotos.length; i++) {
+      if (y + fotoH + 10 > 275) {
+        pdf.addPage(); y = 20;
+        col = 0;
+      }
+      const x = M + col * (fotoW + 8);
+      try {
+        // Draw border
+        pdf.setDrawColor(220, 220, 220); pdf.setLineWidth(0.3);
+        pdf.rect(x, y, fotoW, fotoH, 'S');
+        pdf.addImage(oplFotos[i].dataUrl, 'JPEG', x + 0.5, y + 0.5, fotoW - 1, fotoH - 1);
+      } catch(e) { console.error('Foto error:', e); }
+      // Caption
+      pdf.setFontSize(7); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(120, 120, 120);
+      pdf.text('Foto ' + (i + 1) + ': ' + (oplFotos[i].name || ''), x, y + fotoH + 4);
+
+      col++;
+      if (col >= 2) {
+        col = 0;
+        y += fotoH + 10;
+      }
+    }
   }
 
   // FOOTER op alle pagina's
