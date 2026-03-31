@@ -2809,6 +2809,13 @@ function copyOfferteToOplever() {
   alert('Gegevens overgenomen uit offerte/PvA!');
 }
 
+function changeBronnen(delta) {
+  const el = document.getElementById('opl-bronnen');
+  const n = Math.max(1, Math.min(50, (parseInt(el.value) || 1) + delta));
+  el.value = n;
+  renderBronTabel();
+}
+
 function renderBronTabel() {
   const n = parseInt(document.getElementById('opl-bronnen').value) || 1;
   const container = document.getElementById('opl-bron-tabel');

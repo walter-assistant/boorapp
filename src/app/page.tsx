@@ -672,7 +672,6 @@ const BOORAPP_HTML = `
               <select id="pva-boorvloeistof">
                 <option>Leidingwater</option>
                 <option>Leidingwater + Barogel</option>
-                <option>Leidingwater + EZ Mud</option>
                 <option>Geen (droog boren)</option>
               </select>
             </div>
@@ -978,7 +977,7 @@ const BOORAPP_HTML = `
                 <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:400; text-transform:none; letter-spacing:0;"><input type="checkbox" class="pva-equip-cb" value="Kraan" checked> Kraan</label>
                 <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:400; text-transform:none; letter-spacing:0;"><input type="checkbox" class="pva-equip-cb" value="Groutunit + slangen" checked> Groutunit + slangen</label>
                 <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:400; text-transform:none; letter-spacing:0;"><input type="checkbox" class="pva-equip-cb" value="IBC werkwater" checked> IBC werkwater</label>
-                <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:400; text-transform:none; letter-spacing:0;"><input type="checkbox" class="pva-equip-cb" value="Barogel / EZ Mud" checked> Barogel / EZ Mud</label>
+                <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:400; text-transform:none; letter-spacing:0;"><input type="checkbox" class="pva-equip-cb" value="Barogel" checked> Barogel</label>
                 <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:400; text-transform:none; letter-spacing:0;"><input type="checkbox" class="pva-equip-cb" value="Lussen" checked> Lussen</label>
                 <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:400; text-transform:none; letter-spacing:0;"><input type="checkbox" class="pva-equip-cb" value="Verdelerput"> Verdelerput</label>
                 <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:400; text-transform:none; letter-spacing:0;"><input type="checkbox" class="pva-equip-cb" value="Glycol"> Glycol</label>
@@ -1070,7 +1069,13 @@ const BOORAPP_HTML = `
 
           <h3 style="color:#1e3a5f; margin:16px 0 8px; font-size:14px;">Systeemgegevens</h3>
           <div class="form-row">
-            <div class="form-group"><label>Aantal bronnen</label><input type="number" id="opl-bronnen" value="1" min="1" max="20" onchange="renderBronTabel()"></div>
+            <div class="form-group"><label>Aantal bronnen</label>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <button class="btn btn-sm" onclick="changeBronnen(-1)" style="padding:4px 10px; font-size:16px; font-weight:700;">−</button>
+                <input type="number" id="opl-bronnen" value="1" min="1" max="50" onchange="renderBronTabel()" style="width:50px; text-align:center;">
+                <button class="btn btn-sm btn-primary" onclick="changeBronnen(1)" style="padding:4px 10px; font-size:16px; font-weight:700;">+</button>
+              </div>
+            </div>
             <div class="form-group"><label>Type systeem</label>
               <select id="opl-systeem">
                 <option value="Gesloten bodemenergiesysteem (verticaal)">Gesloten verticaal</option>
