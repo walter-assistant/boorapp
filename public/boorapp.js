@@ -3120,16 +3120,7 @@ function generateOpleverPDF() {
   const LGRIJS = [160, 160, 160];
   const GROEN = [46, 125, 50];
 
-  function addFooter() {
-    const pageCount = pdf.internal.getNumberOfPages();
-    for (let pg = 1; pg <= pageCount; pg++) {
-      pdf.setPage(pg);
-      pdf.setFontSize(7); pdf.setTextColor(...LGRIJS);
-      pdf.setDrawColor(220, 220, 220); pdf.setLineWidth(0.2); pdf.line(M, 287, W - M, 287);
-      pdf.text(`Ground Research BV  —  Opleverrapport  —  ${p.projectnr || ''}  —  ${p.locatie || ''}`, M, 291);
-      pdf.text(`Pagina ${pg}/${pageCount}`, W - M, 291, { align: 'right' });
-    }
-  }
+  // Footer function removed
 
   function h1(text) {
     if (y + 14 > 275) { pdf.addPage(); y = 20; }
@@ -3240,12 +3231,6 @@ function generateOpleverPDF() {
   for (const line of garantieText) { textLine(line); }
 
   y += 2;
-  pdf.setFillColor(255, 248, 225); pdf.rect(M, y - 3, CW, 10, 'F');
-  pdf.setDrawColor(230, 160, 0); pdf.setLineWidth(0.6); pdf.line(M, y - 3, M, y + 7);
-  pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(180, 100, 0);
-  pdf.text('Op de tekening is een "NO DIG ZONE" aangegeven. In deze zone mogen geen', M + 4, y + 1);
-  pdf.text('werkzaamheden plaatsvinden.', M + 4, y + 5.5);
-  y += 14;
 
   // Project details op garantiecertificaat
   pdf.setDrawColor(...BLAUW); pdf.setLineWidth(0.3); pdf.line(M, y, M + CW, y); y += 6;
@@ -3400,13 +3385,7 @@ function generateOpleverPDF() {
       y += imgH + 6;
     }
 
-    // NO DIG ZONE waarschuwing op laatste tekening-pagina
-    if (y + 12 < 275) {
-      pdf.setFillColor(255, 248, 225); pdf.rect(M, y, CW, 10, 'F');
-      pdf.setDrawColor(230, 160, 0); pdf.setLineWidth(0.6); pdf.line(M, y, M, y + 10);
-      pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(180, 100, 0);
-      pdf.text('\u26A0  NO DIG ZONE \u2014 In de aangegeven zone mogen geen graafwerkzaamheden plaatsvinden.', M + 4, y + 6);
-    }
+        }
   }
 
   // ===================== FOTO'S =====================
@@ -3458,7 +3437,7 @@ function generateOpleverPDF() {
   }
 
   // FOOTER op alle pagina's
-  addFooter();
+  // Footer removed per user request
 
   const filename = `${p.kenmerk || p.projectnr || 'Oplever'}_${p.locatie || ''}_Opleverrapport.pdf`.replace(/[^a-zA-Z0-9_.-]/g, '_');
   pdf.save(filename);
