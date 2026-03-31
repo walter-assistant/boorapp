@@ -3379,12 +3379,18 @@ function generateOpleverPDF() {
     pdf.text(p.locatie || '', M, 22);
     y = 36;
 
-    // Fit image to page
+    // Fit image to page, behoud aspect ratio, gebruik maximale ruimte
     const maxImgW = CW;
-    const maxImgH = 240;
-    const ratio = Math.min(maxImgW / oplTekening.w, maxImgH / oplTekening.h);
-    const imgW = oplTekening.w * ratio;
-    const imgH = oplTekening.h * ratio;
+    const maxImgH = 245;
+    const imgRatio = oplTekening.w / oplTekening.h;
+    let imgW, imgH;
+    if (imgRatio > maxImgW / maxImgH) {
+      imgW = maxImgW;
+      imgH = maxImgW / imgRatio;
+    } else {
+      imgH = maxImgH;
+      imgW = maxImgH * imgRatio;
+    }
     try {
       pdf.addImage(oplTekening.dataUrl, 'JPEG', M + (CW - imgW) / 2, y, imgW, imgH);
     } catch(e) { console.error('Boortekening error:', e); }
@@ -3409,32 +3415,41 @@ function generateOpleverPDF() {
     pdf.text(p.locatie + '  |  ' + (p.datum ? formatDate(p.datum) : ''), M, 22);
     y = 36;
 
-    // Place photos in 2-column grid
-    const fotoW = (CW - 8) / 2;
-    const fotoH = fotoW * 0.75;  // 4:3 aspect
-    let col = 0;
+    // Max 2 foto's per pagina, onder elkaar, aspect ratio behouden
+    const maxFotoW = CW;
+    const maxFotoH = 115;  // max hoogte per foto zodat er 2 op een pagina passen
 
     for (let i = 0; i < oplFotos.length; i++) {
-      if (y + fotoH + 10 > 275) {
+      // Check of er ruimte is (foto + caption)
+      if (y + maxFotoH + 12 > 278) {
         pdf.addPage(); y = 20;
-        col = 0;
       }
-      const x = M + col * (fotoW + 8);
-      try {
-        // Draw border
-        pdf.setDrawColor(220, 220, 220); pdf.setLineWidth(0.3);
-        pdf.rect(x, y, fotoW, fotoH, 'S');
-        pdf.addImage(oplFotos[i].dataUrl, 'JPEG', x + 0.5, y + 0.5, fotoW - 1, fotoH - 1);
-      } catch(e) { console.error('Foto error:', e); }
-      // Caption
-      pdf.setFontSize(7); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(120, 120, 120);
-      pdf.text('Foto ' + (i + 1) + ': ' + (oplFotos[i].name || ''), x, y + fotoH + 4);
 
-      col++;
-      if (col >= 2) {
-        col = 0;
-        y += fotoH + 10;
+      // Bereken afmetingen met behoud van aspect ratio
+      const imgRatio = oplFotos[i].w / oplFotos[i].h;
+      let fW, fH;
+      if (imgRatio > maxFotoW / maxFotoH) {
+        // Breed formaat: breedte is limiterend
+        fW = maxFotoW;
+        fH = maxFotoW / imgRatio;
+      } else {
+        // Hoog formaat: hoogte is limiterend
+        fH = maxFotoH;
+        fW = maxFotoH * imgRatio;
       }
+
+      const x = M + (CW - fW) / 2;  // centreer
+      try {
+        pdf.setDrawColor(200, 200, 200); pdf.setLineWidth(0.3);
+        pdf.rect(x - 0.5, y - 0.5, fW + 1, fH + 1, 'S');
+        pdf.addImage(oplFotos[i].dataUrl, 'JPEG', x, y, fW, fH);
+      } catch(e) { console.error('Foto error:', e); }
+
+      // Caption
+      pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(120, 120, 120);
+      pdf.text('Foto ' + (i + 1) + (oplFotos[i].name ? ': ' + oplFotos[i].name : ''), x, y + fH + 5);
+
+      y += fH + 12;
     }
   }
 
