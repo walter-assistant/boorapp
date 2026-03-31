@@ -718,7 +718,7 @@ function parseEur(s) {
 // ============================================================
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach((t, i) => {
-    const tabs = ['offerte', 'klanten', 'opgeslagen', 'pva'];
+    const tabs = ['offerte', 'klanten', 'opgeslagen', 'pva', 'oplever'];
     t.classList.toggle('active', tabs[i] === name);
   });
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -727,6 +727,7 @@ function switchTab(name) {
   if (name === 'opgeslagen') renderOffertes();
   if (name === 'offerte') populateKlantDropdown();
   if (name === 'pva') initPvaTab();
+  if (name === 'oplever') initOpleverTab();
 }
 
 // ============================================================
@@ -2740,4 +2741,302 @@ function renderPvaBsLegend() {
     if (!used.has(parseInt(code))) continue;
     el.innerHTML += `<span style="display:flex;align-items:center;gap:4px;"><span style="width:16px;height:10px;border-radius:2px;border:1px solid rgba(0,0,0,0.15);background:${info.color};display:inline-block;"></span>${info.name}</span>`;
   }
+}
+
+// ============================================================
+// OPLEVERRAPPORT
+// ============================================================
+let opleverInitDone = false;
+
+function initOpleverTab() {
+  if (!opleverInitDone) {
+    renderBronTabel();
+    opleverInitDone = true;
+  }
+}
+
+function copyOfferteToOplever() {
+  // Kopieer data uit offerte-tab
+  const v = id => (document.getElementById(id)?.value || '');
+  const klantId = v('f-klant');
+  if (klantId && klantId !== '__new__') {
+    const klant = getKlanten().find(k => k.id == klantId);
+    if (klant) document.getElementById('opl-klant').value = klant.bedrijf;
+  }
+  document.getElementById('opl-tav').value = v('f-tav');
+  document.getElementById('opl-kenmerk').value = v('f-kenmerk');
+  document.getElementById('opl-locatie').value = v('f-locatie');
+  document.getElementById('opl-projectnr').value = v('f-kenmerk');
+  document.getElementById('opl-telefoon').value = v('f-telefoon');
+  document.getElementById('opl-diameter').value = v('f-diameter');
+  document.getElementById('opl-luslengte').value = v('f-luslengte');
+  document.getElementById('opl-bronnen').value = v('f-boringen') || '1';
+  document.getElementById('opl-datum').value = new Date().toISOString().substring(0, 10);
+
+  // Kopieer PvA-velden indien beschikbaar
+  if (v('pva-glycoltype')) document.getElementById('opl-glycoltype').value = v('pva-glycoltype');
+  if (v('pva-glycolconc')) document.getElementById('opl-glycolconc').value = v('pva-glycolconc');
+  if (v('pva-druktestbar')) document.getElementById('opl-druktestbar').value = v('pva-druktestbar');
+  if (v('pva-druktestmin')) document.getElementById('opl-druktestmin').value = v('pva-druktestmin');
+  if (v('pva-circulatietijd')) document.getElementById('opl-circulatietijd').value = v('pva-circulatietijd');
+  if (v('pva-boorvloeistof')) document.getElementById('opl-boorvloeistof').value = v('pva-boorvloeistof');
+  if (v('pva-afdichting')) document.getElementById('opl-afdichting').value = v('pva-afdichting');
+  if (v('pva-opleverdruk')) document.getElementById('opl-opleverdruk').value = v('pva-opleverdruk');
+  if (v('pva-olo')) document.getElementById('opl-olo').value = v('pva-olo');
+
+  renderBronTabel();
+  alert('Gegevens overgenomen uit offerte/PvA!');
+}
+
+function renderBronTabel() {
+  const n = parseInt(document.getElementById('opl-bronnen').value) || 1;
+  const container = document.getElementById('opl-bron-tabel');
+  // Bewaar bestaande waarden
+  const existing = {};
+  container.querySelectorAll('input').forEach(el => { existing[el.id] = el.value; });
+
+  let html = '<table style="width:100%; font-size:12px;">';
+  html += '<tr><th style="padding:6px 8px;">Bron</th><th style="padding:6px 8px;">Naam</th><th style="padding:6px 8px;">Diepte (m)</th><th style="padding:6px 8px;">Druktest</th></tr>';
+  for (let i = 1; i <= n; i++) {
+    html += `<tr>
+      <td style="padding:4px 8px; font-weight:600; color:#1e3a5f;">${i}</td>
+      <td style="padding:4px 4px;"><input type="text" id="opl-bron-${i}-naam" value="${existing['opl-bron-'+i+'-naam'] || 'Bron '+i}" style="width:100%; padding:4px 6px; border:1px solid #d0d5dd; border-radius:4px; font-size:12px;"></td>
+      <td style="padding:4px 4px;"><input type="text" id="opl-bron-${i}-diepte" value="${existing['opl-bron-'+i+'-diepte'] || ''}" placeholder="m" style="width:60px; padding:4px 6px; border:1px solid #d0d5dd; border-radius:4px; font-size:12px; text-align:right;"></td>
+      <td style="padding:4px 4px;">
+        <select id="opl-bron-${i}-druktest" style="padding:4px 6px; border:1px solid #d0d5dd; border-radius:4px; font-size:12px;">
+          <option value="Goedgekeurd" ${(existing['opl-bron-'+i+'-druktest']||'') !== 'Afgekeurd' ? 'selected' : ''}>✅ Goed</option>
+          <option value="Afgekeurd" ${(existing['opl-bron-'+i+'-druktest']||'') === 'Afgekeurd' ? 'selected' : ''}>❌ Afgekeurd</option>
+        </select>
+      </td>
+    </tr>`;
+  }
+  html += '</table>';
+  container.innerHTML = html;
+}
+
+function gatherOpleverData() {
+  const v = id => (document.getElementById(id)?.value || '');
+  const n = parseInt(v('opl-bronnen')) || 1;
+  const bronnen = [];
+  for (let i = 1; i <= n; i++) {
+    bronnen.push({
+      nr: i,
+      naam: v('opl-bron-' + i + '-naam') || 'Bron ' + i,
+      diepte: v('opl-bron-' + i + '-diepte') || '-',
+      druktest: v('opl-bron-' + i + '-druktest') || 'Goedgekeurd',
+    });
+  }
+
+  return {
+    klant: v('opl-klant'), projectnr: v('opl-projectnr'), tav: v('opl-tav'),
+    telefoon: v('opl-telefoon'), locatie: v('opl-locatie'), datum: v('opl-datum'),
+    kenmerk: v('opl-kenmerk'), olo: v('opl-olo'),
+    systeem: v('opl-systeem'), diameter: v('opl-diameter'), luslengte: v('opl-luslengte'),
+    boorvloeistof: v('opl-boorvloeistof'), afdichting: v('opl-afdichting'),
+    glycoltype: v('opl-glycoltype'), glycolconc: v('opl-glycolconc'),
+    druktestbar: v('opl-druktestbar'), druktestmin: v('opl-druktestmin'),
+    circulatietijd: v('opl-circulatietijd'), opleverdruk: v('opl-opleverdruk'),
+    opmerkingen: v('opl-opmerkingen'), garantie: v('opl-garantie'),
+    garantievoorwaarden: v('opl-garantievoorwaarden'),
+    bronnen, aantalBronnen: n,
+  };
+}
+
+function generateOpleverPDF() {
+  const p = gatherOpleverData();
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const W = 210, M = 15, CW = W - 2 * M;
+  let y = 15;
+
+  const BLAUW = [30, 58, 95];
+  const ZWART = [33, 33, 33];
+  const GRIJS = [100, 100, 100];
+  const LGRIJS = [160, 160, 160];
+  const GROEN = [46, 125, 50];
+
+  function h1(text) {
+    if (y + 14 > 275) { pdf.addPage(); y = 15; }
+    pdf.setFillColor(...BLAUW); pdf.rect(M, y - 4, CW, 8, 'F');
+    pdf.setFontSize(11); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(255, 255, 255);
+    pdf.text(text, M + 3, y + 1); y += 9;
+  }
+  function h2(text) {
+    if (y + 10 > 275) { pdf.addPage(); y = 15; }
+    pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...BLAUW);
+    pdf.text(text, M, y); y += 1;
+    pdf.setDrawColor(...BLAUW); pdf.setLineWidth(0.3); pdf.line(M, y, M + CW, y); y += 5;
+  }
+  function fieldRow(label, value, x, w) {
+    if (y + 5 > 275) { pdf.addPage(); y = 15; }
+    x = x || M;
+    pdf.setFontSize(8); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...GRIJS);
+    pdf.text(label + ':', x, y);
+    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
+    const maxW = CW - (w || 50) - 2;
+    const lines = pdf.splitTextToSize(String(value || '-'), maxW);
+    pdf.text(lines, x + (w || 50), y);
+    y += Math.max(lines.length * 3.5, 4.5);
+  }
+
+  // ===================== HEADER =====================
+  pdf.setFillColor(...BLAUW); pdf.rect(0, 0, W, 28, 'F');
+  pdf.setFontSize(16); pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold');
+  pdf.text('Opleverrapport', M, 12);
+  pdf.setFontSize(10); pdf.setFont('helvetica', 'normal');
+  pdf.text('Gesloten Bodemenergiesysteem — Ground Research BV', M, 19);
+  pdf.setFontSize(7); pdf.setTextColor(200, 210, 230);
+  pdf.text('Vrijheidweg 45, 1521RP Wormerveer  |  06-47326322  |  info@groundresearch.nl', M, 25);
+  y = 36;
+
+  // ===================== PROJECTGEGEVENS =====================
+  h1('PROJECTGEGEVENS');
+  fieldRow('Klantnaam', p.klant);
+  fieldRow('T.a.v.', p.tav);
+  fieldRow('Telefoonnummer', p.telefoon);
+  fieldRow('Locatie', p.locatie);
+  fieldRow('Projectnummer', p.projectnr);
+  fieldRow('Ons kenmerk', p.kenmerk);
+  fieldRow('Datum oplevering', p.datum ? formatDate(p.datum) : '-');
+  fieldRow('OLO/BRO referentie', p.olo);
+  y += 3;
+
+  // ===================== SYSTEEMGEGEVENS =====================
+  h1('SYSTEEMGEGEVENS');
+  fieldRow('Type systeem', p.systeem);
+  fieldRow('Aantal bronnen', String(p.aantalBronnen));
+  fieldRow('Lus diameter', p.diameter + ' mm (single-U)');
+  fieldRow('Luslengte', p.luslengte + ' m');
+  fieldRow('Boorvloeistof', p.boorvloeistof);
+  fieldRow('Afdichtingsmateriaal', p.afdichting);
+  fieldRow('Glycol type', p.glycoltype);
+  fieldRow('Glycol concentratie', p.glycolconc);
+  y += 3;
+
+  // ===================== BRONGEGEVENS =====================
+  h1('BRONGEGEVENS & DRUKTEST');
+
+  // Tabelheader
+  if (y + 8 > 275) { pdf.addPage(); y = 15; }
+  pdf.setFillColor(240, 242, 245);
+  pdf.rect(M, y - 3, CW, 6, 'F');
+  pdf.setFontSize(8); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...BLAUW);
+  const colW = [12, 50, 30, 35, 45];
+  const colX = [M];
+  for (let i = 1; i < colW.length; i++) colX.push(colX[i-1] + colW[i-1]);
+  pdf.text('Nr', colX[0] + 2, y);
+  pdf.text('Naam bron', colX[1] + 2, y);
+  pdf.text('Diepte (m)', colX[2] + 2, y);
+  pdf.text('Druktest', colX[3] + 2, y);
+  pdf.text('Resultaat', colX[4] + 2, y);
+  y += 5;
+
+  // Bronrijen
+  pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
+  for (const b of p.bronnen) {
+    if (y + 5 > 275) { pdf.addPage(); y = 15; }
+    pdf.setFontSize(8);
+    pdf.text(String(b.nr), colX[0] + 2, y);
+    pdf.text(b.naam, colX[1] + 2, y);
+    pdf.text(b.diepte + ' m', colX[2] + 2, y);
+    pdf.text(p.druktestbar + ' bar / ' + p.druktestmin + ' min', colX[3] + 2, y);
+    if (b.druktest === 'Goedgekeurd') {
+      pdf.setTextColor(...GROEN);
+      pdf.text('✓ Goedgekeurd', colX[4] + 2, y);
+    } else {
+      pdf.setTextColor(198, 40, 40);
+      pdf.text('✗ Afgekeurd', colX[4] + 2, y);
+    }
+    pdf.setTextColor(...ZWART);
+    y += 5;
+    // Streep onder rij
+    pdf.setDrawColor(230, 230, 230); pdf.setLineWidth(0.15);
+    pdf.line(M, y - 2, M + CW, y - 2);
+  }
+  y += 4;
+
+  // ===================== UITVOERING =====================
+  h1('UITVOERING & DRUKTEST');
+  fieldRow('Druktest uitgevoerd', p.druktestbar + ' bar gedurende ' + p.druktestmin + ' minuten');
+  fieldRow('Circulatietijd', p.circulatietijd + ' minuten per lus');
+  fieldRow('Vulmedium', p.glycoltype + ' (' + p.glycolconc + ')');
+  fieldRow('Oplevering', p.opleverdruk);
+  if (p.opmerkingen) {
+    y += 2;
+    h2('Opmerkingen / Bijzonderheden');
+    pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
+    const opmLines = pdf.splitTextToSize(p.opmerkingen, CW - 4);
+    for (const line of opmLines) {
+      if (y + 4 > 275) { pdf.addPage(); y = 15; }
+      pdf.text(line, M + 2, y); y += 3.5;
+    }
+  }
+  y += 3;
+
+  // ===================== GARANTIE =====================
+  h1('GARANTIE');
+  fieldRow('Garantietermijn', p.garantie);
+  if (p.garantievoorwaarden) {
+    y += 1;
+    pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
+    const gLines = pdf.splitTextToSize(p.garantievoorwaarden, CW - 4);
+    for (const line of gLines) {
+      if (y + 4 > 275) { pdf.addPage(); y = 15; }
+      pdf.text(line, M + 2, y); y += 3.5;
+    }
+  }
+  y += 5;
+
+  // ===================== CONFORMITEITSVERKLARING =====================
+  h1('CONFORMITEITSVERKLARING');
+  if (y + 40 > 275) { pdf.addPage(); y = 15; }
+  pdf.setFillColor(232, 245, 233);
+  pdf.rect(M, y - 2, CW, 28, 'F');
+  pdf.setDrawColor(...GROEN); pdf.setLineWidth(0.8);
+  pdf.line(M, y - 2, M, y + 26);
+
+  pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...GROEN);
+  pdf.text('Verklaring van conformiteit', M + 4, y + 2);
+  pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
+  const confText = [
+    'Hierbij verklaart Ground Research BV dat het gesloten bodemenergiesysteem',
+    'is aangelegd conform de eisen gesteld in BRL 2100 en BRL 11000.',
+    '',
+    'Alle boringen zijn uitgevoerd, afgedicht en opgeleverd conform protocol.',
+    'De druktesten zijn succesvol afgerond en het systeem is gevuld met glycol.',
+  ];
+  let cy = y + 7;
+  for (const line of confText) {
+    pdf.text(line, M + 4, cy); cy += 3.5;
+  }
+  y = cy + 6;
+
+  // ===================== ONDERTEKENING =====================
+  if (y + 35 > 275) { pdf.addPage(); y = 15; }
+  pdf.setDrawColor(...BLAUW); pdf.setLineWidth(0.5); pdf.rect(M, y, CW, 30, 'S');
+  y += 6;
+  pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...BLAUW);
+  pdf.text('Opgeleverd door:', M + 4, y); y += 5;
+  pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
+  pdf.text('Pim Groot — Projectleider Ground Research BV', M + 4, y); y += 5;
+  pdf.setFontSize(8); pdf.setTextColor(...GRIJS);
+  pdf.text('BRL2100 / BRL11000 gecertificeerd', M + 4, y); y += 6;
+  pdf.text('Datum: _______________    Handtekening: _______________', M + 4, y);
+
+  // FOOTER op alle pagina's
+  const pageCount = pdf.internal.getNumberOfPages();
+  for (let pg = 1; pg <= pageCount; pg++) {
+    pdf.setPage(pg);
+    pdf.setFontSize(7); pdf.setTextColor(...LGRIJS);
+    pdf.setDrawColor(220, 220, 220); pdf.setLineWidth(0.2); pdf.line(M, 287, W - M, 287);
+    pdf.text(`Ground Research BV  —  Opleverrapport  —  ${p.projectnr || ''}  —  ${p.locatie || ''}`, M, 291);
+    pdf.text(`Pagina ${pg}/${pageCount}`, W - M, 291, { align: 'right' });
+  }
+
+  const filename = `Opleverrapport_${p.projectnr || 'draft'}_${p.klant || ''}.pdf`.replace(/[^a-zA-Z0-9_.-]/g, '_');
+  pdf.save(filename);
+
+  // Upload naar Dropbox
+  const oplProject = ((p.projectnr || '') + (p.locatie ? '-' + p.locatie : '')).trim() || 'draft';
+  uploadToDropbox(pdf, filename, p.klant || '', oplProject, 'Opleverrapport');
 }

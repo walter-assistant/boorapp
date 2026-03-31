@@ -269,6 +269,7 @@ const BOORAPP_HTML = `
   <div class="tab" onclick="switchTab('klanten')">Klantenlijst</div>
   <div class="tab" onclick="switchTab('opgeslagen')">Opgeslagen Offertes</div>
   <div class="tab" onclick="switchTab('pva')">Plan van Aanpak</div>
+  <div class="tab" onclick="switchTab('oplever')">Opleverrapport</div>
 </div>
 
 <div class="container">
@@ -1033,6 +1034,128 @@ const BOORAPP_HTML = `
           <div style="margin-top:12px; font-size:11px; color:#888;">
             Goedgekeurd door Pim Groot — Voldoet aan kwaliteitseisen GR
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: OPLEVERRAPPORT -->
+  <div id="tab-oplever" class="tab-content">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+
+      <!-- LINKER KOLOM -->
+      <div>
+        <div class="panel">
+          <h2>Opleverrapport Gesloten Bodemenergiesysteem</h2>
+          <div style="margin-bottom:10px; padding:8px 12px; background:#e8f5e9; border-radius:6px; font-size:12px; color:#2e7d32;">
+            ✅ Data wordt automatisch overgenomen uit de offerte/PvA. Vul alleen de brongegevens en meetwaarden in.
+          </div>
+
+          <h3 style="color:#1e3a5f; margin:16px 0 8px; font-size:14px;">Projectgegevens</h3>
+          <div class="form-row">
+            <div class="form-group"><label>Klantnaam</label><input type="text" id="opl-klant" placeholder="Klantnaam"></div>
+            <div class="form-group"><label>Projectnummer</label><input type="text" id="opl-projectnr" placeholder="35-2025-009"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>T.a.v.</label><input type="text" id="opl-tav" placeholder="Contactpersoon"></div>
+            <div class="form-group"><label>Telefoonnummer</label><input type="text" id="opl-telefoon" placeholder="06-..."></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Locatie</label><input type="text" id="opl-locatie" placeholder="Adres"></div>
+            <div class="form-group"><label>Datum oplevering</label><input type="date" id="opl-datum"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Ons kenmerk</label><input type="text" id="opl-kenmerk" placeholder="35-2025-009"></div>
+            <div class="form-group"><label>OLO/BRO referentie</label><input type="text" id="opl-olo" placeholder="OLO nummer"></div>
+          </div>
+
+          <h3 style="color:#1e3a5f; margin:16px 0 8px; font-size:14px;">Systeemgegevens</h3>
+          <div class="form-row">
+            <div class="form-group"><label>Aantal bronnen</label><input type="number" id="opl-bronnen" value="1" min="1" max="20" onchange="renderBronTabel()"></div>
+            <div class="form-group"><label>Type systeem</label>
+              <select id="opl-systeem">
+                <option value="Gesloten bodemenergiesysteem (verticaal)">Gesloten verticaal</option>
+                <option value="Gesloten bodemenergiesysteem (horizontaal)">Gesloten horizontaal</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Lus diameter</label>
+              <select id="opl-diameter">
+                <option value="32">32 mm (single-U)</option>
+                <option value="40" selected>40 mm (single-U)</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Luslengte</label>
+              <select id="opl-luslengte">
+                <option value="50">50m</option><option value="80">80m</option><option value="110">110m</option>
+                <option value="127">127m</option><option value="138">138m</option><option value="152">152m</option>
+                <option value="165" selected>165m</option><option value="175">175m</option><option value="185">185m</option>
+                <option value="200">200m</option><option value="225">225m</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Boorvloeistof</label><input type="text" id="opl-boorvloeistof" value="Barogel / EZ Mud"></div>
+            <div class="form-group"><label>Afdichtingsmateriaal</label><input type="text" id="opl-afdichting" value="Grout (ThermoCem Plus)"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Glycol type</label><input type="text" id="opl-glycoltype" value="Mono Propyleenglycol"></div>
+            <div class="form-group"><label>Glycol concentratie</label><input type="text" id="opl-glycolconc" value="30%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RECHTER KOLOM -->
+      <div>
+        <div class="panel">
+          <h3 style="color:#1e3a5f; margin:0 0 12px; font-size:14px;">Brongegevens</h3>
+          <div style="margin-bottom:8px; font-size:11px; color:#888;">Vul per bron de naam, diepte en druktest-resultaten in.</div>
+          <div id="opl-bron-tabel"></div>
+        </div>
+
+        <div class="panel" style="margin-top:16px;">
+          <h3 style="color:#1e3a5f; margin:0 0 12px; font-size:14px;">Druktest & Oplevering</h3>
+          <div class="form-row">
+            <div class="form-group"><label>Druktest druk (bar)</label><input type="text" id="opl-druktestbar" value="6"></div>
+            <div class="form-group"><label>Druktest duur (min)</label><input type="text" id="opl-druktestmin" value="30"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Circulatietijd (min/lus)</label><input type="text" id="opl-circulatietijd" value="20"></div>
+            <div class="form-group">
+              <label>Oplevering druk</label>
+              <select id="opl-opleverdruk">
+                <option value="Op druk opgeleverd (6 bar)">Op druk (6 bar)</option>
+                <option value="Op druk opgeleverd (3 bar)">Op druk (3 bar)</option>
+                <option value="Drukloos opgeleverd">Drukloos</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row full">
+            <div class="form-group"><label>Opmerkingen</label><textarea id="opl-opmerkingen" rows="3" placeholder="Bijzonderheden tijdens uitvoering..." style="padding:8px 10px; border:1px solid #d0d5dd; border-radius:5px; font-size:14px; resize:vertical;"></textarea></div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:16px;">
+          <h3 style="color:#1e3a5f; margin:0 0 12px; font-size:14px;">Garantie</h3>
+          <div class="form-row full">
+            <div class="form-group"><label>Garantietermijn</label>
+              <select id="opl-garantie">
+                <option value="2 jaar">2 jaar</option>
+                <option value="5 jaar">5 jaar</option>
+                <option value="10 jaar" selected>10 jaar</option>
+                <option value="Geen">Geen</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row full">
+            <div class="form-group"><label>Garantievoorwaarden</label><textarea id="opl-garantievoorwaarden" rows="3" style="padding:8px 10px; border:1px solid #d0d5dd; border-radius:5px; font-size:14px; resize:vertical;">Garantie geldt voor de geleverde leidingwerk en koppelingen mits het systeem wordt gebruikt en onderhouden volgens de richtlijnen van de fabrikant.</textarea></div>
+          </div>
+        </div>
+
+        <div class="btn-group" style="margin-top:16px;">
+          <button class="btn btn-success" onclick="generateOpleverPDF()">📄 Opleverrapport PDF</button>
+          <button class="btn btn-primary" onclick="copyOfferteToOplever()">📋 Overnemen uit offerte</button>
         </div>
       </div>
     </div>
