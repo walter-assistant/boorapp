@@ -2898,7 +2898,6 @@ function generateOpleverPDF() {
   fieldRow('Projectnummer', p.projectnr);
   fieldRow('Ons kenmerk', p.kenmerk);
   fieldRow('Datum oplevering', p.datum ? formatDate(p.datum) : '-');
-  fieldRow('OLO/BRO referentie', p.olo);
   y += 3;
 
   // ===================== SYSTEEMGEGEVENS =====================

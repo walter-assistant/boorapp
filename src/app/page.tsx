@@ -1066,7 +1066,6 @@ const BOORAPP_HTML = `
           </div>
           <div class="form-row">
             <div class="form-group"><label>Ons kenmerk</label><input type="text" id="opl-kenmerk" placeholder="35-2025-009"></div>
-            <div class="form-group"><label>OLO/BRO referentie</label><input type="text" id="opl-olo" placeholder="OLO nummer"></div>
           </div>
 
           <h3 style="color:#1e3a5f; margin:16px 0 8px; font-size:14px;">Systeemgegevens</h3>
@@ -1096,11 +1095,17 @@ const BOORAPP_HTML = `
             </div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Boorvloeistof</label><input type="text" id="opl-boorvloeistof" value="Barogel / EZ Mud"></div>
+            <div class="form-group"><label>Boorvloeistof</label><input type="text" id="opl-boorvloeistof" value="Water/Barogel"></div>
             <div class="form-group"><label>Afdichtingsmateriaal</label><input type="text" id="opl-afdichting" value="Grout (ThermoCem Plus)"></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Glycol type</label><input type="text" id="opl-glycoltype" value="Mono Propyleenglycol"></div>
+            <div class="form-group"><label>Glycol type</label>
+              <select id="opl-glycoltype">
+                <option value="Ethyleen glycol" selected>Ethyleen glycol</option>
+                <option value="Mono Propyleen glycol">Mono Propyleen glycol</option>
+                <option value="Water">Water</option>
+              </select>
+            </div>
             <div class="form-group"><label>Glycol concentratie</label><input type="text" id="opl-glycolconc" value="30%"></div>
           </div>
         </div>
