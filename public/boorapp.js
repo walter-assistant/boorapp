@@ -1946,6 +1946,12 @@ function autoRestoreAll() {
         if (data._pvaAndersText[i]) el.value = data._pvaAndersText[i];
       });
     }
+    // Migrate old glycol cans → liters: if old param-glycol-cans exists in data, reset glycol price
+    if (data['param-glycol-cans'] !== undefined || !data['param-glycol-liters']) {
+      const priceEl = document.getElementById('param-glycol-prijs');
+      if (priceEl) priceEl.value = eur(PARAM_DEFAULTS.glycol.prijsPerLiter);
+      costParams.glycol = JSON.parse(JSON.stringify(PARAM_DEFAULTS.glycol));
+    }
   } catch (e) { /* ignore corrupt data */ }
 }
 
