@@ -3271,7 +3271,7 @@ function generateOpleverPDF() {
   fieldRow('Buis diameter', p.diameter + ' mm');
   fieldRow('Aantal bronnen', String(p.aantalBronnen));
   fieldRow('Diepte bronnen', p.bronnen.map(b => b.diepte + 'm').join(', '));
-  fieldRow('Gevuld', p.glycoltype === 'Water' ? '100% water' : (100 - parseInt(p.glycolconc)) + '% water – ' + p.glycolconc + ' ' + p.glycoltype);
+  fieldRow('Gevuld', p.glycoltype === 'Water' ? '100% water' : (100 - parseInt(p.glycolconc)) + '% water + ' + p.glycolconc + ' ' + p.glycoltype.toLowerCase());
   fieldRow('Oplevering volgens', p.certificering);
   fieldRow('Boorvloeistof', p.boorvloeistof);
   fieldRow('Afdichting', p.afdichting);
@@ -3354,7 +3354,7 @@ function generateOpleverPDF() {
     pdf.setTextColor(...ZWART);
   }
 
-  const glycolLabel = p.glycoltype === 'Water' ? 'water' : p.glycolconc + ' ' + p.glycoltype.toLowerCase() + ' en ' + (100 - parseInt(p.glycolconc)) + '% water';
+  const glycolLabel = p.glycoltype === 'Water' ? 'water' : (100 - parseInt(p.glycolconc)) + '% water + ' + p.glycolconc + ' ' + p.glycoltype.toLowerCase();
   bulletLine(`Systeem is met een verhouding van ${glycolLabel} afgevuld en gecirculeerd.`);
   bulletLine(`${p.opleverdruk || 'Drukloos opgeleverd'}.`);
 
