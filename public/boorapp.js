@@ -2795,17 +2795,24 @@ function renderBronTabel() {
   const existing = {};
   container.querySelectorAll('input').forEach(el => { existing[el.id] = el.value; });
 
-  let html = '<table style="width:100%; font-size:12px;">';
-  html += '<tr><th style="padding:6px 8px;">Bron</th><th style="padding:6px 8px;">Naam</th><th style="padding:6px 8px;">Diepte (m)</th><th style="padding:6px 8px;">Druktest</th></tr>';
+  let html = '<table style="width:100%; font-size:11px;">';
+  html += '<tr><th style="padding:5px 4px;">Nr</th><th style="padding:5px 4px;">Naam</th><th style="padding:5px 4px;">Diepte</th><th style="padding:5px 4px;">Pomdruk</th><th style="padding:5px 4px;">Tijd</th><th style="padding:5px 4px;">Druktest</th><th style="padding:5px 4px;">Status</th></tr>';
   for (let i = 1; i <= n; i++) {
+    const diepte = existing['opl-bron-'+i+'-diepte'] || '';
+    const pomdruk = existing['opl-bron-'+i+'-pomdruk'] || '5';
+    const tijd = existing['opl-bron-'+i+'-tijd'] || '20';
+    const druktest = existing['opl-bron-'+i+'-druktestbar'] || '3';
     html += `<tr>
-      <td style="padding:4px 8px; font-weight:600; color:#1e3a5f;">${i}</td>
-      <td style="padding:4px 4px;"><input type="text" id="opl-bron-${i}-naam" value="${existing['opl-bron-'+i+'-naam'] || 'Bron '+i}" style="width:100%; padding:4px 6px; border:1px solid #d0d5dd; border-radius:4px; font-size:12px;"></td>
-      <td style="padding:4px 4px;"><input type="text" id="opl-bron-${i}-diepte" value="${existing['opl-bron-'+i+'-diepte'] || ''}" placeholder="m" style="width:60px; padding:4px 6px; border:1px solid #d0d5dd; border-radius:4px; font-size:12px; text-align:right;"></td>
-      <td style="padding:4px 4px;">
-        <select id="opl-bron-${i}-druktest" style="padding:4px 6px; border:1px solid #d0d5dd; border-radius:4px; font-size:12px;">
-          <option value="Goedgekeurd" ${(existing['opl-bron-'+i+'-druktest']||'') !== 'Afgekeurd' ? 'selected' : ''}>✅ Goed</option>
-          <option value="Afgekeurd" ${(existing['opl-bron-'+i+'-druktest']||'') === 'Afgekeurd' ? 'selected' : ''}>❌ Afgekeurd</option>
+      <td style="padding:3px 4px; font-weight:600; color:#1e3a5f;">${i}</td>
+      <td style="padding:3px 2px;"><input type="text" id="opl-bron-${i}-naam" value="${existing['opl-bron-'+i+'-naam'] || 'Bron '+i}" style="width:80px; padding:3px 4px; border:1px solid #d0d5dd; border-radius:3px; font-size:11px;"></td>
+      <td style="padding:3px 2px;"><input type="text" id="opl-bron-${i}-diepte" value="${diepte}" placeholder="m" style="width:45px; padding:3px 4px; border:1px solid #d0d5dd; border-radius:3px; font-size:11px; text-align:right;"></td>
+      <td style="padding:3px 2px;"><input type="text" id="opl-bron-${i}-pomdruk" value="${pomdruk}" style="width:35px; padding:3px 4px; border:1px solid #d0d5dd; border-radius:3px; font-size:11px; text-align:right;"> bar</td>
+      <td style="padding:3px 2px;"><input type="text" id="opl-bron-${i}-tijd" value="${tijd}" style="width:35px; padding:3px 4px; border:1px solid #d0d5dd; border-radius:3px; font-size:11px; text-align:right;"> min</td>
+      <td style="padding:3px 2px;"><input type="text" id="opl-bron-${i}-druktestbar" value="${druktest}" style="width:35px; padding:3px 4px; border:1px solid #d0d5dd; border-radius:3px; font-size:11px; text-align:right;"> bar</td>
+      <td style="padding:3px 2px;">
+        <select id="opl-bron-${i}-status" style="padding:3px 4px; border:1px solid #d0d5dd; border-radius:3px; font-size:11px;">
+          <option value="Goedgekeurd" ${(existing['opl-bron-'+i+'-status']||'') !== 'Afgekeurd' ? 'selected' : ''}>✅</option>
+          <option value="Afgekeurd" ${(existing['opl-bron-'+i+'-status']||'') === 'Afgekeurd' ? 'selected' : ''}>❌</option>
         </select>
       </td>
     </tr>`;
@@ -2823,21 +2830,26 @@ function gatherOpleverData() {
       nr: i,
       naam: v('opl-bron-' + i + '-naam') || 'Bron ' + i,
       diepte: v('opl-bron-' + i + '-diepte') || '-',
-      druktest: v('opl-bron-' + i + '-druktest') || 'Goedgekeurd',
+      pomdruk: v('opl-bron-' + i + '-pomdruk') || '5',
+      tijd: v('opl-bron-' + i + '-tijd') || '20',
+      druktestbar: v('opl-bron-' + i + '-druktestbar') || '3',
+      status: v('opl-bron-' + i + '-status') || 'Goedgekeurd',
     });
   }
 
   return {
     klant: v('opl-klant'), projectnr: v('opl-projectnr'), tav: v('opl-tav'),
     telefoon: v('opl-telefoon'), locatie: v('opl-locatie'), datum: v('opl-datum'),
-    kenmerk: v('opl-kenmerk'), olo: v('opl-olo'),
+    kenmerk: v('opl-kenmerk'),
     systeem: v('opl-systeem'), diameter: v('opl-diameter'), luslengte: v('opl-luslengte'),
     boorvloeistof: v('opl-boorvloeistof'), afdichting: v('opl-afdichting'),
     glycoltype: v('opl-glycoltype'), glycolconc: v('opl-glycolconc'),
     druktestbar: v('opl-druktestbar'), druktestmin: v('opl-druktestmin'),
     circulatietijd: v('opl-circulatietijd'), opleverdruk: v('opl-opleverdruk'),
-    opmerkingen: v('opl-opmerkingen'), garantie: v('opl-garantie'),
-    garantievoorwaarden: v('opl-garantievoorwaarden'),
+    opmerkingen: v('opl-opmerkingen'),
+    garantieH: v('opl-garantie-h'), garantieV: v('opl-garantie-v'),
+    verslepingstype: v('opl-verslepingstype'), certificering: v('opl-certificering'),
+    monteurs: v('opl-monteurs'), werkzaamheden: v('opl-werkzaamheden'),
     bronnen, aantalBronnen: n,
   };
 }
@@ -2846,7 +2858,7 @@ function generateOpleverPDF() {
   const p = gatherOpleverData();
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF('p', 'mm', 'a4');
-  const W = 210, M = 15, CW = W - 2 * M;
+  const W = 210, M = 20, CW = W - 2 * M;
   let y = 15;
 
   const BLAUW = [30, 58, 95];
@@ -2855,184 +2867,266 @@ function generateOpleverPDF() {
   const LGRIJS = [160, 160, 160];
   const GROEN = [46, 125, 50];
 
+  function addFooter() {
+    const pageCount = pdf.internal.getNumberOfPages();
+    for (let pg = 1; pg <= pageCount; pg++) {
+      pdf.setPage(pg);
+      pdf.setFontSize(7); pdf.setTextColor(...LGRIJS);
+      pdf.setDrawColor(220, 220, 220); pdf.setLineWidth(0.2); pdf.line(M, 287, W - M, 287);
+      pdf.text(`Ground Research BV  —  Opleverrapport  —  ${p.projectnr || ''}  —  ${p.locatie || ''}`, M, 291);
+      pdf.text(`Pagina ${pg}/${pageCount}`, W - M, 291, { align: 'right' });
+    }
+  }
+
   function h1(text) {
-    if (y + 14 > 275) { pdf.addPage(); y = 15; }
+    if (y + 14 > 275) { pdf.addPage(); y = 20; }
     pdf.setFillColor(...BLAUW); pdf.rect(M, y - 4, CW, 8, 'F');
     pdf.setFontSize(11); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(255, 255, 255);
-    pdf.text(text, M + 3, y + 1); y += 9;
+    pdf.text(text, M + 3, y + 1); y += 10;
   }
-  function h2(text) {
-    if (y + 10 > 275) { pdf.addPage(); y = 15; }
-    pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...BLAUW);
-    pdf.text(text, M, y); y += 1;
-    pdf.setDrawColor(...BLAUW); pdf.setLineWidth(0.3); pdf.line(M, y, M + CW, y); y += 5;
-  }
-  function fieldRow(label, value, x, w) {
-    if (y + 5 > 275) { pdf.addPage(); y = 15; }
-    x = x || M;
-    pdf.setFontSize(8); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...GRIJS);
-    pdf.text(label + ':', x, y);
+  function fieldRow(label, value) {
+    if (y + 5 > 275) { pdf.addPage(); y = 20; }
+    pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...GRIJS);
+    pdf.text(label, M, y);
     pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
-    const maxW = CW - (w || 50) - 2;
-    const lines = pdf.splitTextToSize(String(value || '-'), maxW);
-    pdf.text(lines, x + (w || 50), y);
-    y += Math.max(lines.length * 3.5, 4.5);
+    pdf.text(String(value || '-'), M + 55, y);
+    y += 5;
+  }
+  function textLine(text, bold) {
+    if (y + 4 > 275) { pdf.addPage(); y = 20; }
+    pdf.setFontSize(9); pdf.setFont('helvetica', bold ? 'bold' : 'normal'); pdf.setTextColor(...ZWART);
+    pdf.text(text, M, y); y += 4.5;
+  }
+  function bulletLine(text) {
+    if (y + 4 > 275) { pdf.addPage(); y = 20; }
+    pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
+    pdf.text('-  ' + text, M + 2, y); y += 4.5;
   }
 
-  // ===================== HEADER =====================
+  // ============================================================
+  // PAGINA 1: BEGELEIDENDE BRIEF
+  // ============================================================
+  pdf.setFillColor(...BLAUW); pdf.rect(0, 0, W, 32, 'F');
+  pdf.setFontSize(18); pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold');
+  pdf.text('Ground Research BV', M, 14);
+  pdf.setFontSize(9); pdf.setFont('helvetica', 'normal');
+  pdf.text('Vrijheidweg 45, 1521RP Wormerveer  |  06-47326322  |  info@groundresearch.nl', M, 22);
+  pdf.setFontSize(8); pdf.setTextColor(200, 210, 230);
+  pdf.text('BRL2100 / BRL11000 gecertificeerd', M, 28);
+  y = 45;
+
+  // Adressering
+  pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...ZWART);
+  pdf.text(p.klant || '', M, y); y += 5;
+  pdf.setFontSize(9); pdf.setFont('helvetica', 'normal');
+  if (p.tav) { pdf.text('T.a.v.  ' + p.tav, M, y); y += 5; }
+  y += 5;
+
+  pdf.setFontSize(9); pdf.setTextColor(...GRIJS);
+  pdf.text('Ons kenmerk  :  ' + (p.kenmerk || p.projectnr), M, y); y += 5;
+  pdf.text('Datum  :  ' + (p.datum ? formatDate(p.datum) : '-'), M, y); y += 5;
+  pdf.text('Betreft  :  Opleverrapportage energiesysteem', M, y); y += 10;
+
+  pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
+  textLine('Geachte heer/mevrouw,');
+  y += 3;
+  textLine('In aansluiting op de overeenkomst ontvangt u hierbij het garantiecertificaat,');
+  textLine('afpersrapport en opleverrapportage.');
+  y += 3;
+  textLine('Hopende u hiermee voldoende van dienst te zijn geweest.');
+  textLine('Vanzelfsprekend zijn wij bereid dit voorstel toe te lichten.');
+  textLine('U kunt hiervoor contact opnemen met Pim Groot.');
+  y += 8;
+  textLine('Met vriendelijke groet,');
+  textLine('Ground Research BV');
+  y += 3;
+  pdf.setFont('helvetica', 'italic');
+  pdf.text('P. Groot, bedrijfsleider', M, y); y += 4.5;
+  pdf.text('Tel.: 06-47326322', M, y); y += 8;
+
+  // Bijlagen
+  pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...BLAUW);
+  pdf.text('Bijlagen:', M, y); y += 5;
+  pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
+  bulletLine('Garantiecertificaat');
+  bulletLine('Afpersrapport');
+  bulletLine('Opleverrapportage');
+
+  // ============================================================
+  // PAGINA 2: GARANTIECERTIFICAAT
+  // ============================================================
+  pdf.addPage(); y = 20;
+
   pdf.setFillColor(...BLAUW); pdf.rect(0, 0, W, 28, 'F');
   pdf.setFontSize(16); pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold');
-  pdf.text('Opleverrapport', M, 12);
-  pdf.setFontSize(10); pdf.setFont('helvetica', 'normal');
-  pdf.text('Gesloten Bodemenergiesysteem — Ground Research BV', M, 19);
-  pdf.setFontSize(7); pdf.setTextColor(200, 210, 230);
-  pdf.text('Vrijheidweg 45, 1521RP Wormerveer  |  06-47326322  |  info@groundresearch.nl', M, 25);
-  y = 36;
+  pdf.text('Garantiecertificaat', M, 14);
+  pdf.setFontSize(9); pdf.setFont('helvetica', 'normal');
+  pdf.text('Ground Research BV', M, 22);
+  y = 38;
 
-  // ===================== PROJECTGEGEVENS =====================
-  h1('PROJECTGEGEVENS');
-  fieldRow('Klantnaam', p.klant);
-  fieldRow('T.a.v.', p.tav);
-  fieldRow('Telefoonnummer', p.telefoon);
-  fieldRow('Locatie', p.locatie);
+  pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
+  const garantieText = [
+    `Ground Research BV geeft door middel van dit certificaat een garantie van ${p.garantieH || '10 jaar'} op de`,
+    `horizontale verslepingen en ${p.garantieV || '25 jaar'} op de verticale bronnen na oplevering.`,
+    '',
+    'Eventuele lekkages als gevolg van foutieve installatie of materiaalfouten die binnen',
+    '1 jaar na oplevering optreden, dienen schriftelijk te worden gemeld aan Ground Research BV',
+    'en worden kosteloos hersteld. Wijze en termijn van herstel worden in gezamenlijk overleg',
+    'bepaald. Ground Research BV wijst aansprakelijkheid voor gevolgschade uitdrukkelijk van de hand.',
+    '',
+    'Garanties komen te vervallen indien gebreken zijn veroorzaakt door de klant, derden,',
+    'vandalisme, ondeskundig gebruik, bovenbelasting, externe oorzaken, grondzetting,',
+    'bodemverontreiniging of calamiteiten.',
+    '',
+  ];
+  for (const line of garantieText) { textLine(line); }
+
+  y += 2;
+  pdf.setFillColor(255, 248, 225); pdf.rect(M, y - 3, CW, 10, 'F');
+  pdf.setDrawColor(230, 160, 0); pdf.setLineWidth(0.6); pdf.line(M, y - 3, M, y + 7);
+  pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(180, 100, 0);
+  pdf.text('Op de tekening is een "NO DIG ZONE" aangegeven. In deze zone mogen geen', M + 4, y + 1);
+  pdf.text('werkzaamheden plaatsvinden.', M + 4, y + 5.5);
+  y += 14;
+
+  // Project details op garantiecertificaat
+  pdf.setDrawColor(...BLAUW); pdf.setLineWidth(0.3); pdf.line(M, y, M + CW, y); y += 6;
+  fieldRow('Opdrachtgever', p.klant);
   fieldRow('Projectnummer', p.projectnr);
-  fieldRow('Ons kenmerk', p.kenmerk);
+  fieldRow('Projectlocatie', p.locatie);
   fieldRow('Datum oplevering', p.datum ? formatDate(p.datum) : '-');
-  y += 3;
 
-  // ===================== SYSTEEMGEGEVENS =====================
-  h1('SYSTEEMGEGEVENS');
-  fieldRow('Type systeem', p.systeem);
-  fieldRow('Aantal bronnen', String(p.aantalBronnen));
-  fieldRow('Lus diameter', p.diameter + ' mm (single-U)');
-  fieldRow('Luslengte', p.luslengte + ' m');
-  fieldRow('Boorvloeistof', p.boorvloeistof);
-  fieldRow('Afdichtingsmateriaal', p.afdichting);
-  fieldRow('Glycol type', p.glycoltype);
-  fieldRow('Glycol concentratie', p.glycolconc);
-  y += 3;
+  // ============================================================
+  // PAGINA 3: AFPERSPROTOCOL
+  // ============================================================
+  pdf.addPage(); y = 20;
 
-  // ===================== BRONGEGEVENS =====================
-  h1('BRONGEGEVENS & DRUKTEST');
+  pdf.setFillColor(...BLAUW); pdf.rect(0, 0, W, 28, 'F');
+  pdf.setFontSize(16); pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold');
+  pdf.text('Afpersprotocol', M, 14);
+  pdf.setFontSize(9); pdf.setFont('helvetica', 'normal');
+  pdf.text('Ground Research BV', M, 22);
+  y = 38;
 
-  // Tabelheader
-  if (y + 8 > 275) { pdf.addPage(); y = 15; }
-  pdf.setFillColor(240, 242, 245);
-  pdf.rect(M, y - 3, CW, 6, 'F');
-  pdf.setFontSize(8); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...BLAUW);
-  const colW = [12, 50, 30, 35, 45];
-  const colX = [M];
-  for (let i = 1; i < colW.length; i++) colX.push(colX[i-1] + colW[i-1]);
-  pdf.text('Nr', colX[0] + 2, y);
-  pdf.text('Naam bron', colX[1] + 2, y);
-  pdf.text('Diepte (m)', colX[2] + 2, y);
-  pdf.text('Druktest', colX[3] + 2, y);
-  pdf.text('Resultaat', colX[4] + 2, y);
-  y += 5;
-
-  // Bronrijen
-  pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
-  for (const b of p.bronnen) {
-    if (y + 5 > 275) { pdf.addPage(); y = 15; }
-    pdf.setFontSize(8);
-    pdf.text(String(b.nr), colX[0] + 2, y);
-    pdf.text(b.naam, colX[1] + 2, y);
-    pdf.text(b.diepte + ' m', colX[2] + 2, y);
-    pdf.text(p.druktestbar + ' bar / ' + p.druktestmin + ' min', colX[3] + 2, y);
-    if (b.druktest === 'Goedgekeurd') {
-      pdf.setTextColor(...GROEN);
-      pdf.text('✓ Goedgekeurd', colX[4] + 2, y);
-    } else {
-      pdf.setTextColor(198, 40, 40);
-      pdf.text('✗ Afgekeurd', colX[4] + 2, y);
-    }
-    pdf.setTextColor(...ZWART);
-    y += 5;
-    // Streep onder rij
-    pdf.setDrawColor(230, 230, 230); pdf.setLineWidth(0.15);
-    pdf.line(M, y - 2, M + CW, y - 2);
-  }
+  pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
+  textLine('Ground Research BV geeft door middel van dit certificaat aan hoe het systeem');
+  textLine('is opgeleverd. Tijdens de oplevering is het volgende gecontroleerd:');
   y += 4;
 
-  // ===================== UITVOERING =====================
-  h1('UITVOERING & DRUKTEST');
-  fieldRow('Druktest uitgevoerd', p.druktestbar + ' bar gedurende ' + p.druktestmin + ' minuten');
-  fieldRow('Circulatietijd', p.circulatietijd + ' minuten per lus');
-  fieldRow('Vulmedium', p.glycoltype + ' (' + p.glycolconc + ')');
-  fieldRow('Oplevering', p.opleverdruk);
+  bulletLine(`Het systeem is ${p.circulatietijd || '20'} min per lus gecirculeerd en ontlucht.`);
+  bulletLine(`Het systeem is ${p.druktestmin || '20'} min per lus op minimaal ${p.druktestbar || '3'} bar druk weggezet om lekkages uit te sluiten.`);
+
+  // Check of alle bronnen goedgekeurd zijn
+  const alleGoed = p.bronnen.every(b => b.status === 'Goedgekeurd');
+  if (alleGoed) {
+    bulletLine('Het systeem vertoont geen afwijkingen tijdens het op druk zetten van het systeem.');
+  } else {
+    pdf.setTextColor(198, 40, 40);
+    bulletLine('LET OP: Niet alle bronnen zijn goedgekeurd — zie afpersrapport.');
+    pdf.setTextColor(...ZWART);
+  }
+
+  const glycolLabel = p.glycoltype === 'Water' ? 'water' : p.glycolconc + ' ' + p.glycoltype.toLowerCase() + ' en ' + (100 - parseInt(p.glycolconc)) + '% water';
+  bulletLine(`Systeem is met een verhouding van ${glycolLabel} afgevuld en gecirculeerd.`);
+  bulletLine(`${p.opleverdruk || 'Drukloos opgeleverd'}.`);
+  y += 6;
+
   if (p.opmerkingen) {
-    y += 2;
-    h2('Opmerkingen / Bijzonderheden');
-    pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
+    pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...BLAUW);
+    pdf.text('Opmerkingen:', M, y); y += 5;
+    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
     const opmLines = pdf.splitTextToSize(p.opmerkingen, CW - 4);
     for (const line of opmLines) {
-      if (y + 4 > 275) { pdf.addPage(); y = 15; }
-      pdf.text(line, M + 2, y); y += 3.5;
+      if (y + 4 > 275) { pdf.addPage(); y = 20; }
+      pdf.text(line, M + 2, y); y += 4;
     }
+    y += 4;
   }
-  y += 3;
 
-  // ===================== GARANTIE =====================
-  h1('GARANTIE');
-  fieldRow('Garantietermijn', p.garantie);
-  if (p.garantievoorwaarden) {
-    y += 1;
-    pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
-    const gLines = pdf.splitTextToSize(p.garantievoorwaarden, CW - 4);
-    for (const line of gLines) {
-      if (y + 4 > 275) { pdf.addPage(); y = 15; }
-      pdf.text(line, M + 2, y); y += 3.5;
-    }
-  }
-  y += 5;
+  // ============================================================
+  // PAGINA 4: TECHNISCHE OPLEVERING + AFPERSRAPPORT TABEL
+  // ============================================================
+  pdf.addPage(); y = 20;
 
-  // ===================== CONFORMITEITSVERKLARING =====================
-  h1('CONFORMITEITSVERKLARING');
-  if (y + 40 > 275) { pdf.addPage(); y = 15; }
-  pdf.setFillColor(232, 245, 233);
-  pdf.rect(M, y - 2, CW, 28, 'F');
-  pdf.setDrawColor(...GROEN); pdf.setLineWidth(0.8);
-  pdf.line(M, y - 2, M, y + 26);
+  pdf.setFillColor(...BLAUW); pdf.rect(0, 0, W, 28, 'F');
+  pdf.setFontSize(16); pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold');
+  pdf.text('Technische Oplevering', M, 14);
+  pdf.setFontSize(9); pdf.setFont('helvetica', 'normal');
+  pdf.text('Ground Research BV', M, 22);
+  y = 38;
 
-  pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...GROEN);
-  pdf.text('Verklaring van conformiteit', M + 4, y + 2);
-  pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
-  const confText = [
-    'Hierbij verklaart Ground Research BV dat het gesloten bodemenergiesysteem',
-    'is aangelegd conform de eisen gesteld in BRL 2100 en BRL 11000.',
-    '',
-    'Alle boringen zijn uitgevoerd, afgedicht en opgeleverd conform protocol.',
-    'De druktesten zijn succesvol afgerond en het systeem is gevuld met glycol.',
-  ];
-  let cy = y + 7;
-  for (const line of confText) {
-    pdf.text(line, M + 4, cy); cy += 3.5;
-  }
-  y = cy + 6;
-
-  // ===================== ONDERTEKENING =====================
-  if (y + 35 > 275) { pdf.addPage(); y = 15; }
-  pdf.setDrawColor(...BLAUW); pdf.setLineWidth(0.5); pdf.rect(M, y, CW, 30, 'S');
+  fieldRow('Verslepingstype', p.verslepingstype);
+  fieldRow('Buis diameter', p.diameter + ' mm');
+  fieldRow('Aantal bronnen', String(p.aantalBronnen));
+  fieldRow('Diepte bronnen', p.bronnen.map(b => b.diepte + 'm').join(', '));
+  fieldRow('Gevuld', p.glycoltype === 'Water' ? '100% water' : (100 - parseInt(p.glycolconc)) + '% water – ' + p.glycolconc + ' ' + p.glycoltype);
+  fieldRow('Oplevering volgens', p.certificering);
+  fieldRow('Boorvloeistof', p.boorvloeistof);
+  fieldRow('Afdichting', p.afdichting);
   y += 6;
-  pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...BLAUW);
-  pdf.text('Opgeleverd door:', M + 4, y); y += 5;
-  pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
-  pdf.text('Pim Groot — Projectleider Ground Research BV', M + 4, y); y += 5;
-  pdf.setFontSize(8); pdf.setTextColor(...GRIJS);
-  pdf.text('BRL2100 / BRL11000 gecertificeerd', M + 4, y); y += 6;
-  pdf.text('Datum: _______________    Handtekening: _______________', M + 4, y);
+
+  // Projectinfo blok
+  pdf.setDrawColor(...BLAUW); pdf.setLineWidth(0.3); pdf.line(M, y, M + CW, y); y += 6;
+  fieldRow('Oplevering', p.datum ? formatDate(p.datum) : '-');
+  fieldRow('Locatie', p.locatie);
+  fieldRow('Opdrachtnummer', p.projectnr);
+  fieldRow('Werkzaamheden', p.werkzaamheden);
+  fieldRow('Contactpersoon', p.tav);
+  fieldRow('Telefoonnummer', p.telefoon);
+  fieldRow('Naam monteur(s)', p.monteurs);
+  y += 8;
+
+  // ===================== AFPERSRAPPORT TABEL =====================
+  h1('AFPERSRAPPORT BODEMWARMTEWISSELAARSYSTEEM');
+  y += 2;
+
+  // Naam project + locatie
+  fieldRow('Naam project', p.klant);
+  fieldRow('Locatie boringen', p.locatie);
+  y += 4;
+
+  // Tabelheader
+  if (y + 8 > 275) { pdf.addPage(); y = 20; }
+  pdf.setFillColor(240, 242, 245);
+  pdf.rect(M, y - 3, CW, 7, 'F');
+  pdf.setFontSize(8); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...BLAUW);
+  const cx = [M+2, M+25, M+55, M+80, M+100, M+125, M+150];
+  pdf.text('Lus \u00F8 mm', cx[0], y);
+  pdf.text('Datum', cx[1], y);
+  pdf.text('Pomdruk max', cx[2], y);
+  pdf.text('Tijd test', cx[3], y);
+  pdf.text('Druktest (bar)', cx[4], y);
+  pdf.text('Bron', cx[5], y);
+  pdf.text('Status', cx[6], y);
+  y += 6;
+
+  // Bronrijen
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor(...ZWART);
+  for (const b of p.bronnen) {
+    if (y + 5 > 275) { pdf.addPage(); y = 20; }
+    pdf.text(p.diameter, cx[0], y);
+    pdf.text(p.datum ? formatDate(p.datum) : '-', cx[1], y);
+    pdf.text(b.pomdruk + ' bar', cx[2], y);
+    pdf.text(b.tijd + ' min', cx[3], y);
+    pdf.text(b.druktestbar + ' bar', cx[4], y);
+    pdf.text(b.naam, cx[5], y);
+    if (b.status === 'Goedgekeurd') {
+      pdf.setTextColor(...GROEN); pdf.setFont('helvetica', 'bold');
+      pdf.text('OK', cx[6], y);
+    } else {
+      pdf.setTextColor(198, 40, 40); pdf.setFont('helvetica', 'bold');
+      pdf.text('NOK', cx[6], y);
+    }
+    pdf.setTextColor(...ZWART); pdf.setFont('helvetica', 'normal');
+    y += 5;
+    pdf.setDrawColor(220, 220, 220); pdf.setLineWidth(0.15);
+    pdf.line(M, y - 2, M + CW, y - 2);
+  }
 
   // FOOTER op alle pagina's
-  const pageCount = pdf.internal.getNumberOfPages();
-  for (let pg = 1; pg <= pageCount; pg++) {
-    pdf.setPage(pg);
-    pdf.setFontSize(7); pdf.setTextColor(...LGRIJS);
-    pdf.setDrawColor(220, 220, 220); pdf.setLineWidth(0.2); pdf.line(M, 287, W - M, 287);
-    pdf.text(`Ground Research BV  —  Opleverrapport  —  ${p.projectnr || ''}  —  ${p.locatie || ''}`, M, 291);
-    pdf.text(`Pagina ${pg}/${pageCount}`, W - M, 291, { align: 'right' });
-  }
+  addFooter();
 
-  const filename = `Opleverrapport_${p.projectnr || 'draft'}_${p.klant || ''}.pdf`.replace(/[^a-zA-Z0-9_.-]/g, '_');
+  const filename = `${p.kenmerk || p.projectnr || 'Oplever'}_${p.locatie || ''}_Opleverrapport.pdf`.replace(/[^a-zA-Z0-9_.-]/g, '_');
   pdf.save(filename);
 
   // Upload naar Dropbox

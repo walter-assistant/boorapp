@@ -1142,19 +1142,23 @@ const BOORAPP_HTML = `
         </div>
 
         <div class="panel" style="margin-top:16px;">
-          <h3 style="color:#1e3a5f; margin:0 0 12px; font-size:14px;">Garantie</h3>
-          <div class="form-row full">
-            <div class="form-group"><label>Garantietermijn</label>
-              <select id="opl-garantie">
-                <option value="2 jaar">2 jaar</option>
-                <option value="5 jaar">5 jaar</option>
-                <option value="10 jaar" selected>10 jaar</option>
-                <option value="Geen">Geen</option>
+          <h3 style="color:#1e3a5f; margin:0 0 12px; font-size:14px;">Garantie & Oplevering</h3>
+          <div class="form-row">
+            <div class="form-group"><label>Garantie horizontaal</label><input type="text" id="opl-garantie-h" value="10 jaar"></div>
+            <div class="form-group"><label>Garantie verticaal</label><input type="text" id="opl-garantie-v" value="25 jaar"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Verslepingstype</label>
+              <select id="opl-verslepingstype">
+                <option value="Verticaal" selected>Verticaal</option>
+                <option value="Horizontaal">Horizontaal</option>
               </select>
             </div>
+            <div class="form-group"><label>Oplevering volgens</label><input type="text" id="opl-certificering" value="BRL 11000 – 3B certificatie"></div>
           </div>
-          <div class="form-row full">
-            <div class="form-group"><label>Garantievoorwaarden</label><textarea id="opl-garantievoorwaarden" rows="3" style="padding:8px 10px; border:1px solid #d0d5dd; border-radius:5px; font-size:14px; resize:vertical;">Garantie geldt voor de geleverde leidingwerk en koppelingen mits het systeem wordt gebruikt en onderhouden volgens de richtlijnen van de fabrikant.</textarea></div>
+          <div class="form-row">
+            <div class="form-group"><label>Naam monteur(s)</label><input type="text" id="opl-monteurs" placeholder="Naam monteur(s)"></div>
+            <div class="form-group"><label>Werkzaamheden</label><input type="text" id="opl-werkzaamheden" value="Boren en afwerken bronnen"></div>
           </div>
         </div>
 
