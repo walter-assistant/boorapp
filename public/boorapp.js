@@ -1,4 +1,20 @@
 ﻿// ============================================================
+// HANDTEKENING (loaded at init)
+// ============================================================
+let handtekeningB64 = null;
+async function loadHandtekening() {
+  try {
+    const resp = await fetch('/handtekening.b64');
+    if (resp.ok) handtekeningB64 = 'data:image/jpeg;base64,' + await resp.text();
+  } catch(e) { /* no signature available */ }
+}
+
+function addSignature(pdf, x, y, w, h) {
+  if (!handtekeningB64) return;
+  try { pdf.addImage(handtekeningB64, 'JPEG', x, y, w || 40, h || 15); } catch(e) {}
+}
+
+// ============================================================
 // DROPBOX AUTO-SAVE
 // ============================================================
 async function uploadToDropbox(pdfDoc, filename, klant, projectnr, docType) {
@@ -1589,6 +1605,7 @@ function generatePDF() {
   doc.setLineWidth(0.3);
   doc.line(akkoordX + 4, akkoordY + 26, akkoordX + akkoordW - 4, akkoordY + 26);
   doc.text('Handtekening', akkoordX + 4, akkoordY + 31);
+  addSignature(doc, akkoordX + 4, akkoordY + 18, 30, 10);
   
   // Datum lijn
   doc.line(akkoordX + 4, akkoordY + 40, akkoordX + akkoordW - 4, akkoordY + 40);
@@ -1963,6 +1980,9 @@ function attachAutoSave() {
 }
 
 function init() {
+  // Load handtekening
+  loadHandtekening();
+
   // Set today's date
   document.getElementById('f-datum').value = new Date().toISOString().substring(0, 10);
 
@@ -2486,6 +2506,7 @@ function generatePvaPDF() {
   pdf.text('Pim Groot \u2014 Projectleider Ground Research BV', M + 4, y); y += 5;
   pdf.setFontSize(8); pdf.setTextColor(...GRIJS);
   pdf.text('Voldoet aan kwaliteitseisen Ground Research \u2014 BRL2100 / BRL11000', M + 4, y); y += 6;
+  addSignature(pdf, M + 90, y - 8, 35, 12);
   pdf.text('Datum: _______________    Handtekening: _______________', M + 4, y);
 
   // FOOTER
@@ -2940,6 +2961,8 @@ function generateOpleverPDF() {
   textLine('Met vriendelijke groet,');
   textLine('Ground Research BV');
   y += 3;
+  addSignature(pdf, M, y - 2, 35, 12);
+  y += 10;
   pdf.setFont('helvetica', 'italic');
   pdf.text('P. Groot, bedrijfsleider', M, y); y += 4.5;
   pdf.text('Tel.: 06-47326322', M, y); y += 8;
