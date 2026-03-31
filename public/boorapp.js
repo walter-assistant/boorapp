@@ -2772,6 +2772,10 @@ let opleverInitDone = false;
 function initOpleverTab() {
   if (!opleverInitDone) {
     renderBronTabel();
+    restoreOpleverState();
+    // Auto-save on any input change in oplever tab
+    document.getElementById('tab-oplever').addEventListener('input', saveOpleverState);
+    document.getElementById('tab-oplever').addEventListener('change', saveOpleverState);
     opleverInitDone = true;
   }
 }
@@ -2847,6 +2851,7 @@ async function handleFotoDrop(e) {
     oplFotos.push(img);
   }
   renderFotoPreview();
+  saveOpleverState();
 }
 
 async function handleFotoSelect(e) {
@@ -2856,12 +2861,14 @@ async function handleFotoSelect(e) {
     oplFotos.push(img);
   }
   renderFotoPreview();
+  saveOpleverState();
   e.target.value = '';  // reset zodat je dezelfde file opnieuw kunt selecteren
 }
 
 function removeFoto(idx) {
   oplFotos.splice(idx, 1);
   renderFotoPreview();
+  saveOpleverState();
 }
 
 function renderFotoPreview() {
@@ -2883,29 +2890,61 @@ function renderFotoPreview() {
   }
 }
 
+async function renderPdfToImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(e.target.result) }).promise;
+        const page = await pdf.getPage(1);
+        const scale = 2;  // high res
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        resolve({
+          dataUrl: canvas.toDataURL('image/jpeg', 0.9),
+          name: file.name,
+          w: viewport.width,
+          h: viewport.height
+        });
+      } catch(err) { reject(err); }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 async function handleTekeningDrop(e) {
   e.preventDefault();
   e.currentTarget.style.borderColor = '#d0d5dd';
   e.currentTarget.style.background = '#f8f9fb';
-  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-  if (files.length > 0) {
-    oplTekening = await readImageFile(files[0]);
+  const files = Array.from(e.dataTransfer.files);
+  const f = files.find(f => f.type === 'application/pdf' || f.type.startsWith('image/'));
+  if (!f) return;
+  try {
+    oplTekening = f.type === 'application/pdf' ? await renderPdfToImage(f) : await readImageFile(f);
     renderTekeningPreview();
-  }
+    saveOpleverState();
+  } catch(err) { alert('Kon bestand niet laden: ' + err.message); }
 }
 
 async function handleTekeningSelect(e) {
-  const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
-  if (files.length > 0) {
-    oplTekening = await readImageFile(files[0]);
+  const f = Array.from(e.target.files).find(f => f.type === 'application/pdf' || f.type.startsWith('image/'));
+  if (!f) return;
+  try {
+    oplTekening = f.type === 'application/pdf' ? await renderPdfToImage(f) : await readImageFile(f);
     renderTekeningPreview();
-  }
+    saveOpleverState();
+  } catch(err) { alert('Kon bestand niet laden: ' + err.message); }
   e.target.value = '';
 }
 
 function removeTekening() {
   oplTekening = null;
   renderTekeningPreview();
+  saveOpleverState();
 }
 
 function renderTekeningPreview() {
@@ -2916,6 +2955,71 @@ function renderTekeningPreview() {
     '<span onclick="removeTekening()" style="position:absolute; top:-6px; right:-6px; background:#c62828; color:white; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:14px; cursor:pointer; font-weight:bold;">\u00D7</span>' +
     '<div style="font-size:11px; color:#2e7d32; margin-top:4px;">\u2705 ' + oplTekening.name + '</div>' +
     '</div>';
+}
+
+// ============================================================
+// OPLEVER STATE SAVE/RESTORE
+// ============================================================
+const OPLEVER_SAVE_KEY = 'boorapp_oplever_state';
+let _oplSaveTimer = null;
+
+function saveOpleverState() {
+  clearTimeout(_oplSaveTimer);
+  _oplSaveTimer = setTimeout(() => {
+    const state = {
+      fotos: oplFotos,
+      tekening: oplTekening,
+      fields: {}
+    };
+    // Save all opl- fields
+    document.querySelectorAll('[id^="opl-"]').forEach(el => {
+      if (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') {
+        state.fields[el.id] = el.value;
+      }
+    });
+    try {
+      localStorage.setItem(OPLEVER_SAVE_KEY, JSON.stringify(state));
+    } catch(e) {
+      // localStorage full — fotos might be too large, save without them
+      state.fotos = state.fotos.map(f => ({ name: f.name, w: f.w, h: f.h, dataUrl: '' }));
+      state.tekening = state.tekening ? { name: state.tekening.name, w: 0, h: 0, dataUrl: '' } : null;
+      try { localStorage.setItem(OPLEVER_SAVE_KEY, JSON.stringify(state)); } catch(e2) {}
+    }
+  }, 500);
+}
+
+function restoreOpleverState() {
+  try {
+    const raw = localStorage.getItem(OPLEVER_SAVE_KEY);
+    if (!raw) return;
+    const state = JSON.parse(raw);
+    // Restore fotos (only those with actual data)
+    if (state.fotos) {
+      oplFotos = state.fotos.filter(f => f.dataUrl);
+      renderFotoPreview();
+    }
+    // Restore tekening
+    if (state.tekening && state.tekening.dataUrl) {
+      oplTekening = state.tekening;
+      renderTekeningPreview();
+    }
+    // Restore fields
+    if (state.fields) {
+      for (const [id, val] of Object.entries(state.fields)) {
+        const el = document.getElementById(id);
+        if (el) el.value = val;
+      }
+      // Re-render bron tabel with correct count
+      renderBronTabel();
+      // Restore bron field values after re-render
+      setTimeout(() => {
+        for (const [id, val] of Object.entries(state.fields)) {
+          const el = document.getElementById(id);
+          if (el) el.value = val;
+        }
+      }, 50);
+    }
+  } catch(e) { /* corrupt data */ }
 }
 
 function changeBronnen(delta) {

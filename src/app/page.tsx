@@ -55,11 +55,19 @@ export default function Page() {
     jspdfScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
     jspdfScript.async = false;
     jspdfScript.onload = () => {
-      const script = document.createElement('script');
-      script.id = 'boorapp-script';
-      script.src = '/boorapp.js';
-      script.async = false;
-      document.body.appendChild(script);
+      // Load PDF.js for rendering PDF boortekeningen
+      const pdfjsScript = document.createElement('script');
+      pdfjsScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      pdfjsScript.async = false;
+      pdfjsScript.onload = () => {
+        (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        const script = document.createElement('script');
+        script.id = 'boorapp-script';
+        script.src = '/boorapp.js';
+        script.async = false;
+        document.body.appendChild(script);
+      };
+      document.body.appendChild(pdfjsScript);
     };
     document.body.appendChild(jspdfScript);
 
@@ -1187,8 +1195,8 @@ const BOORAPP_HTML = `
             onclick="document.getElementById('opl-tekening-input').click()">
             <div style="font-size:28px; margin-bottom:6px;">📐</div>
             <div style="font-size:13px; color:#666;">Sleep boortekening/kaart hierheen of klik om te selecteren</div>
-            <div style="font-size:11px; color:#999; margin-top:4px;">JPG/PNG — uit Boorpunt of eigen tekening</div>
-            <input type="file" id="opl-tekening-input" accept="image/*" onchange="handleTekeningSelect(event)" style="display:none;">
+            <div style="font-size:11px; color:#999; margin-top:4px;">JPG/PNG/PDF — uit Boorpunt of eigen tekening</div>
+            <input type="file" id="opl-tekening-input" accept="image/*,.pdf,application/pdf" onchange="handleTekeningSelect(event)" style="display:none;">
           </div>
           <div id="opl-tekening-preview" style="margin-top:10px;"></div>
         </div>
