@@ -1060,7 +1060,10 @@ function calc() {
 
   // --- Grout ---
   if (!costOverrides['grout']) {
-    const autoZakken = Math.ceil(mpb / 28) * boringen;
+    // Lookup table: luslengte → grout zakken per boring
+    const groutPerLus = { 50:1, 80:1, 110:2, 127:2, 138:2, 152:2, 165:3, 175:3, 185:3, 200:4, 225:4 };
+    const lusLengteGrout = parseInt(document.getElementById('f-luslengte').value);
+    const autoZakken = (groutPerLus[lusLengteGrout] || Math.ceil(mpb / 28)) * boringen;
     const groutZakken = costParams.grout.aantalZakken !== null ? costParams.grout.aantalZakken : autoZakken;
     const groutPrijs = costParams.grout.prijsPerZak;
     const groutTotaal = groutZakken * groutPrijs;
@@ -1115,7 +1118,10 @@ function calc() {
 
   // --- Barogel ---
   if (!costOverrides['barogel']) {
-    const autoZakken = Math.ceil(mpb / 8.65) * boringen;
+    // Lookup table: luslengte → barogel zakken per boring
+    const barogelPerLus = { 50:2, 80:3, 110:4, 127:4, 138:4, 152:5, 165:7, 175:8, 185:8, 200:8, 225:10 };
+    const lusLengteBarogel = parseInt(document.getElementById('f-luslengte').value);
+    const autoZakken = (barogelPerLus[lusLengteBarogel] || Math.ceil(mpb / 8.65)) * boringen;
     const barogelZakken = costParams.barogel.aantalZakken !== null ? costParams.barogel.aantalZakken : autoZakken;
     const barogelPrijs = costParams.barogel.prijsPerZak;
     setCost('barogel', barogelZakken * barogelPrijs);
