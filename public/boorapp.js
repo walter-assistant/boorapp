@@ -3242,55 +3242,9 @@ function generateOpleverPDF() {
   fieldRow('Projectlocatie', p.locatie);
   fieldRow('Datum oplevering', p.datum ? formatDate(p.datum) : '-');
 
-  // ============================================================
-  // PAGINA 3: AFPERSPROTOCOL
-  // ============================================================
-  pdf.addPage(); y = 20;
-
-  pdf.setFillColor(...BLAUW); pdf.rect(0, 0, W, 28, 'F');
-  pdf.setFontSize(16); pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold');
-  pdf.text('Afpersprotocol', M, 14);
-  pdf.setFontSize(9); pdf.setFont('helvetica', 'normal');
-  pdf.text('Ground Research BV', M, 22);
-  y = 38;
-
-  pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
-  textLine('Ground Research BV geeft door middel van dit certificaat aan hoe het systeem');
-  textLine('is opgeleverd. Tijdens de oplevering is het volgende gecontroleerd:');
-  y += 4;
-
-  bulletLine(`Het systeem is ${p.circulatietijd || '20'} min per lus gecirculeerd en ontlucht.`);
-  bulletLine(`Het systeem is ${p.druktestmin || '20'} min per lus op minimaal ${p.druktestbar || '3'} bar druk weggezet om lekkages uit te sluiten.`);
-
-  // Check of alle bronnen goedgekeurd zijn
-  const alleGoed = p.bronnen.every(b => b.status === 'Goedgekeurd');
-  if (alleGoed) {
-    bulletLine('Het systeem vertoont geen afwijkingen tijdens het op druk zetten van het systeem.');
-  } else {
-    pdf.setTextColor(198, 40, 40);
-    bulletLine('LET OP: Niet alle bronnen zijn goedgekeurd — zie afpersrapport.');
-    pdf.setTextColor(...ZWART);
-  }
-
-  const glycolLabel = p.glycoltype === 'Water' ? 'water' : p.glycolconc + ' ' + p.glycoltype.toLowerCase() + ' en ' + (100 - parseInt(p.glycolconc)) + '% water';
-  bulletLine(`Systeem is met een verhouding van ${glycolLabel} afgevuld en gecirculeerd.`);
-  bulletLine(`${p.opleverdruk || 'Drukloos opgeleverd'}.`);
-  y += 6;
-
-  if (p.opmerkingen) {
-    pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...BLAUW);
-    pdf.text('Opmerkingen:', M, y); y += 5;
-    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
-    const opmLines = pdf.splitTextToSize(p.opmerkingen, CW - 4);
-    for (const line of opmLines) {
-      if (y + 4 > 275) { pdf.addPage(); y = 20; }
-      pdf.text(line, M + 2, y); y += 4;
-    }
-    y += 4;
-  }
 
   // ============================================================
-  // PAGINA 4: TECHNISCHE OPLEVERING + AFPERSRAPPORT TABEL
+  // PAGINA 3: TECHNISCHE OPLEVERING + AFPERSRAPPORT TABEL
   // ============================================================
   pdf.addPage(); y = 20;
 
@@ -3367,6 +3321,41 @@ function generateOpleverPDF() {
     y += 5;
     pdf.setDrawColor(220, 220, 220); pdf.setLineWidth(0.15);
     pdf.line(M, y - 2, M + CW, y - 2);
+  }
+  y += 8;
+
+  // ===================== AFPERSPROTOCOL TEKST =====================
+  pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
+  textLine('Ground Research BV geeft door middel van dit certificaat aan hoe het systeem');
+  textLine('is opgeleverd. Tijdens de oplevering is het volgende gecontroleerd:');
+  y += 3;
+
+  bulletLine(`Het systeem is ${p.circulatietijd || '20'} min per lus gecirculeerd en ontlucht.`);
+  bulletLine(`Het systeem is ${p.druktestmin || '20'} min per lus op minimaal ${p.druktestbar || '3'} bar druk weggezet om lekkages uit te sluiten.`);
+
+  const alleGoed = p.bronnen.every(b => b.status === 'Goedgekeurd');
+  if (alleGoed) {
+    bulletLine('Het systeem vertoont geen afwijkingen tijdens het op druk zetten van het systeem.');
+  } else {
+    pdf.setTextColor(198, 40, 40);
+    bulletLine('LET OP: Niet alle bronnen zijn goedgekeurd \u2014 zie afpersrapport.');
+    pdf.setTextColor(...ZWART);
+  }
+
+  const glycolLabel = p.glycoltype === 'Water' ? 'water' : p.glycolconc + ' ' + p.glycoltype.toLowerCase() + ' en ' + (100 - parseInt(p.glycolconc)) + '% water';
+  bulletLine(`Systeem is met een verhouding van ${glycolLabel} afgevuld en gecirculeerd.`);
+  bulletLine(`${p.opleverdruk || 'Drukloos opgeleverd'}.`);
+
+  if (p.opmerkingen) {
+    y += 4;
+    pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...BLAUW);
+    pdf.text('Opmerkingen:', M, y); y += 5;
+    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
+    const opmLines = pdf.splitTextToSize(p.opmerkingen, CW - 4);
+    for (const line of opmLines) {
+      if (y + 4 > 275) { pdf.addPage(); y = 20; }
+      pdf.text(line, M + 2, y); y += 4;
+    }
   }
 
   // ===================== BOORTEKENING =====================
