@@ -2891,24 +2891,36 @@ function renderFotoPreview() {
 }
 
 async function renderPdfToImage(file) {
+  // Renders ALL pages from PDF, returns array of images
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
         const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(e.target.result) }).promise;
-        const page = await pdf.getPage(1);
-        const scale = 2;  // high res
-        const viewport = page.getViewport({ scale });
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext('2d');
-        await page.render({ canvasContext: ctx, viewport }).promise;
+        const pages = [];
+        for (let p = 1; p <= pdf.numPages; p++) {
+          const page = await pdf.getPage(p);
+          const scale = 2;
+          const viewport = page.getViewport({ scale });
+          const canvas = document.createElement('canvas');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const ctx = canvas.getContext('2d');
+          await page.render({ canvasContext: ctx, viewport }).promise;
+          pages.push({
+            dataUrl: canvas.toDataURL('image/jpeg', 0.9),
+            name: file.name + (pdf.numPages > 1 ? ' (p' + p + ')' : ''),
+            w: viewport.width,
+            h: viewport.height
+          });
+        }
+        // Return as multi-page object
         resolve({
-          dataUrl: canvas.toDataURL('image/jpeg', 0.9),
+          dataUrl: pages[0].dataUrl,
           name: file.name,
-          w: viewport.width,
-          h: viewport.height
+          w: pages[0].w,
+          h: pages[0].h,
+          pages: pages  // all pages
         });
       } catch(err) { reject(err); }
     };
@@ -3360,32 +3372,35 @@ function generateOpleverPDF() {
 
   // ===================== BOORTEKENING =====================
   if (oplTekening) {
-    pdf.addPage(); y = 20;
-    pdf.setFillColor(...BLAUW); pdf.rect(0, 0, W, 28, 'F');
-    pdf.setFontSize(16); pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold');
-    pdf.text('Boortekening met co\u00F6rdinaten', M, 14);
-    pdf.setFontSize(9); pdf.setFont('helvetica', 'normal');
-    pdf.text(p.locatie || '', M, 22);
-    y = 36;
+    const tekeningPages = oplTekening.pages || [oplTekening];
+    for (let tp = 0; tp < tekeningPages.length; tp++) {
+      const tImg = tekeningPages[tp];
+      pdf.addPage(); y = 20;
+      pdf.setFillColor(...BLAUW); pdf.rect(0, 0, W, 28, 'F');
+      pdf.setFontSize(16); pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold');
+      pdf.text(tp === 0 ? 'Boortekening met co\u00F6rdinaten' : 'Boortekening (vervolg)', M, 14);
+      pdf.setFontSize(9); pdf.setFont('helvetica', 'normal');
+      pdf.text(p.locatie || '', M, 22);
+      y = 36;
 
-    // Fit image to page, behoud aspect ratio, gebruik maximale ruimte
-    const maxImgW = CW;
-    const maxImgH = 245;
-    const imgRatio = oplTekening.w / oplTekening.h;
-    let imgW, imgH;
-    if (imgRatio > maxImgW / maxImgH) {
-      imgW = maxImgW;
-      imgH = maxImgW / imgRatio;
-    } else {
-      imgH = maxImgH;
-      imgW = maxImgH * imgRatio;
+      const maxImgW = CW;
+      const maxImgH = 245;
+      const imgRatio = tImg.w / tImg.h;
+      let imgW, imgH;
+      if (imgRatio > maxImgW / maxImgH) {
+        imgW = maxImgW;
+        imgH = maxImgW / imgRatio;
+      } else {
+        imgH = maxImgH;
+        imgW = maxImgH * imgRatio;
+      }
+      try {
+        pdf.addImage(tImg.dataUrl, 'JPEG', M + (CW - imgW) / 2, y, imgW, imgH);
+      } catch(e) { console.error('Boortekening error:', e); }
+      y += imgH + 6;
     }
-    try {
-      pdf.addImage(oplTekening.dataUrl, 'JPEG', M + (CW - imgW) / 2, y, imgW, imgH);
-    } catch(e) { console.error('Boortekening error:', e); }
-    y += imgH + 6;
 
-    // NO DIG ZONE waarschuwing
+    // NO DIG ZONE waarschuwing op laatste tekening-pagina
     if (y + 12 < 275) {
       pdf.setFillColor(255, 248, 225); pdf.rect(M, y, CW, 10, 'F');
       pdf.setDrawColor(230, 160, 0); pdf.setLineWidth(0.6); pdf.line(M, y, M, y + 10);
