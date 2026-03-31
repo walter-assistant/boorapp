@@ -784,7 +784,7 @@ let costParams = {
   gewichten: { aantal: 3, prijsPerStuk: 80 },
   verdelerput: { prijs: 1250 },
   aansluiten: { prijs: 750 },
-  glycol: { aantalCans: null, prijsPerCan: 80 },  // null = auto
+  glycol: { liters: null, prijsPerLiter: 3.20 },  // null = auto from luslengte/diameter
   graafwerk: { prijs: 250 },
   transport: { prijs: 1000 },
   barogel: { aantalZakken: null, prijsPerZak: 17 },
@@ -898,13 +898,14 @@ function buildCostRows() {
         <span class="auto" onclick="resetParam('aansluiten')" title="Reset">↻</span>`));
     }
     if (item.key === 'glycol') {
-      container.appendChild(paramRow('Cans × prijs', `
-        <input type="text" id="param-glycol-cans" placeholder="auto" 
-               oninput="onParamEdit('glycol')" onfocus="this.select()" style="width:50px;">
+      container.appendChild(paramRow('Liters × prijs', `
+        <input type="text" id="param-glycol-liters" placeholder="auto" 
+               oninput="onParamEdit('glycol')" onfocus="this.select()" style="width:60px;">
+        <span style="font-size:11px; color:#999; margin-left:2px;">L</span>
         <span style="font-size:12px; color:#666; margin:0 4px;">×</span>
-        <input type="text" id="param-glycol-prijs" value="${eur(costParams.glycol.prijsPerCan)}" 
+        <input type="text" id="param-glycol-prijs" value="${eur(costParams.glycol.prijsPerLiter)}" 
                oninput="onParamEdit('glycol')" onfocus="this.select()" style="width:80px;">
-        <span style="font-size:11px; color:#999; margin-left:2px;">/can</span>
+        <span style="font-size:11px; color:#999; margin-left:2px;">/L</span>
         <span class="auto" onclick="resetParam('glycol')" title="Reset">↻</span>`));
     }
     if (item.key === 'graafwerk') {
@@ -966,9 +967,9 @@ function onParamEdit(key) {
     case 'verdelerput': p.prijs = parseEur(document.getElementById('param-verdelerput-prijs').value); break;
     case 'aansluiten': p.prijs = parseEur(document.getElementById('param-aansluiten-prijs').value); break;
     case 'glycol': {
-      const c = document.getElementById('param-glycol-cans').value.trim();
-      p.aantalCans = c ? parseInt(c) : null;
-      p.prijsPerCan = parseEur(document.getElementById('param-glycol-prijs').value);
+      const l = document.getElementById('param-glycol-liters').value.trim();
+      p.liters = l ? parseFloat(l.replace(',', '.')) : null;
+      p.prijsPerLiter = parseEur(document.getElementById('param-glycol-prijs').value);
       break;
     }
     case 'graafwerk': p.prijs = parseEur(document.getElementById('param-graafwerk-prijs').value); break;
@@ -996,7 +997,7 @@ function resetParam(key) {
     gewichten: () => { document.getElementById('param-gewichten-aantal').value = PARAM_DEFAULTS.gewichten.aantal; document.getElementById('param-gewichten-prijs').value = eur(PARAM_DEFAULTS.gewichten.prijsPerStuk); },
     verdelerput: () => { document.getElementById('param-verdelerput-prijs').value = eur(PARAM_DEFAULTS.verdelerput.prijs); },
     aansluiten: () => { document.getElementById('param-aansluiten-prijs').value = eur(PARAM_DEFAULTS.aansluiten.prijs); },
-    glycol: () => { document.getElementById('param-glycol-cans').value = ''; document.getElementById('param-glycol-cans').placeholder = 'auto'; document.getElementById('param-glycol-prijs').value = eur(PARAM_DEFAULTS.glycol.prijsPerCan); },
+    glycol: () => { document.getElementById('param-glycol-liters').value = ''; document.getElementById('param-glycol-liters').placeholder = 'auto'; document.getElementById('param-glycol-prijs').value = eur(PARAM_DEFAULTS.glycol.prijsPerLiter); },
     graafwerk: () => { document.getElementById('param-graafwerk-prijs').value = eur(PARAM_DEFAULTS.graafwerk.prijs); },
     transport: () => { document.getElementById('param-transport-prijs').value = eur(PARAM_DEFAULTS.transport.prijs); },
     barogel: () => { document.getElementById('param-barogel-zakken').value = ''; document.getElementById('param-barogel-zakken').placeholder = 'auto'; document.getElementById('param-barogel-prijs').value = eur(PARAM_DEFAULTS.barogel.prijsPerZak); },
@@ -1095,18 +1096,20 @@ function calc() {
 
   // --- Glycol ---
   if (!costOverrides['glycol']) {
+    // Binnendiameter lus in meters (32mm buis → 26mm binnen, 40mm buis → 32.6mm binnen)
     const diam_m = diameter === 32 ? 0.026 : 0.0326;
-    const lusLengte = mpb * 2 * boringen;
-    const inhoud = Math.PI * Math.pow(diam_m / 2, 2) * lusLengte * 1000;
-    const glycolL = inhoud * 0.30;
-    const autoCans = Math.ceil(glycolL / 25);
-    const cans = costParams.glycol.aantalCans !== null ? costParams.glycol.aantalCans : autoCans;
-    const glycolPrijs = cans * costParams.glycol.prijsPerCan;
+    const lusLengteM = parseInt(document.getElementById('f-luslengte').value) || (mpb * 2);
+    const totaleLusLengte = lusLengteM * boringen;
+    const inhoudL = Math.PI * Math.pow(diam_m / 2, 2) * totaleLusLengte * 1000;
+    const autoGlycolL = Math.ceil(inhoudL * 0.30);
+    const glycolL = costParams.glycol.liters !== null ? costParams.glycol.liters : autoGlycolL;
+    const glycolPrijs = glycolL * costParams.glycol.prijsPerLiter;
     setCost('glycol', glycolPrijs);
-    setDetail('glycol', `${glycolL.toFixed(1)}L → ${cans} cans × ${eur(costParams.glycol.prijsPerCan)}`);
-    if (costParams.glycol.aantalCans === null) {
-      const el = document.getElementById('param-glycol-cans');
-      if (el && el !== document.activeElement) el.placeholder = autoCans;
+    const autoLabel = costParams.glycol.liters !== null ? '' : ' (auto)';
+    setDetail('glycol', `${inhoudL.toFixed(0)}L inhoud → ${glycolL}L glycol${autoLabel} × ${eur(costParams.glycol.prijsPerLiter)}/L`);
+    if (costParams.glycol.liters === null) {
+      const el = document.getElementById('param-glycol-liters');
+      if (el && el !== document.activeElement) el.placeholder = autoGlycolL;
     }
   }
 
