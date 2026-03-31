@@ -1099,7 +1099,7 @@ function calc() {
     // Binnendiameter lus in meters (32mm buis → 26mm binnen, 40mm buis → 32.6mm binnen)
     const diam_m = diameter === 32 ? 0.026 : 0.0326;
     const lusLengteM = parseInt(document.getElementById('f-luslengte').value) || (mpb * 2);
-    const totaleLusLengte = lusLengteM * boringen;
+    const totaleLusLengte = lusLengteM * 2 * boringen;  // ×2: lus gaat naar beneden én weer omhoog
     const inhoudL = Math.PI * Math.pow(diam_m / 2, 2) * totaleLusLengte * 1000;
     const autoGlycolL = Math.ceil(inhoudL * 0.30);
     const glycolL = costParams.glycol.liters !== null ? costParams.glycol.liters : autoGlycolL;
