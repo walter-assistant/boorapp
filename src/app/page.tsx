@@ -117,7 +117,7 @@ function LoginPage() {
         <p style={{ opacity: 0.85, fontSize: '0.85rem' }}>Ground Research BV</p>
       </div>
       <div style={loginStyles.card}>
-        <h2 style={{ fontSize: '1.1rem', fontWeight: 800, textAlign: 'center', marginBottom: 20, color: '#2d5a1e' }}>
+        <h2 style={{ fontSize: '1.1rem', fontWeight: 800, textAlign: 'center', marginBottom: 20, color: '#1e3a5f' }}>
           {isRegister ? '📝 Account aanmaken' : '🔐 Inloggen'}
         </h2>
         <form onSubmit={handleSubmit}>
@@ -127,7 +127,7 @@ function LoginPage() {
           <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required minLength={6} style={{ ...loginStyles.input, marginBottom: 16 }} />
           {error && <div style={loginStyles.error}>⚠️ {error}</div>}
           {message && <div style={loginStyles.success}>✅ {message}</div>}
-          <button type="submit" disabled={submitting} style={{ ...loginStyles.button, background: submitting ? '#ccc' : '#2d5a1e', cursor: submitting ? 'not-allowed' : 'pointer' }}>
+          <button type="submit" disabled={submitting} style={{ ...loginStyles.button, background: submitting ? '#ccc' : '#1e3a5f', cursor: submitting ? 'not-allowed' : 'pointer' }}>
             {submitting ? '⏳ Even geduld...' : (isRegister ? '📝 Registreren' : '🔐 Inloggen')}
           </button>
         </form>
@@ -142,7 +142,7 @@ function LoginPage() {
 }
 
 const loginStyles: Record<string, React.CSSProperties> = {
-  container: { minHeight: '100vh', background: 'linear-gradient(135deg, #1a3d0d 0%, #2d5a1e 40%, #61a229 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: 'system-ui, -apple-system, sans-serif' },
+  container: { minHeight: '100vh', background: 'linear-gradient(135deg, #0d1b2a 0%, #1e3a5f 40%, #4da6ff 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: 'system-ui, -apple-system, sans-serif' },
   logo: { textAlign: 'center', marginBottom: 32, color: '#fff' },
   card: { background: '#fff', borderRadius: 20, padding: 24, width: '100%', maxWidth: 400, boxShadow: '0 10px 40px rgba(0,0,0,0.3)' },
   label: { display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#757575', marginBottom: 4 },
@@ -150,13 +150,13 @@ const loginStyles: Record<string, React.CSSProperties> = {
   button: { width: '100%', padding: 14, color: '#fff', border: 'none', borderRadius: 14, fontSize: '0.95rem', fontWeight: 700, fontFamily: 'inherit' },
   error: { background: '#ffebee', color: '#c62828', padding: 10, borderRadius: 10, fontSize: '0.85rem', marginBottom: 12, textAlign: 'center' as const },
   success: { background: '#e8f5e9', color: '#2e7d32', padding: 10, borderRadius: 10, fontSize: '0.85rem', marginBottom: 12, textAlign: 'center' as const },
-  toggleBtn: { background: 'none', border: 'none', color: '#2d5a1e', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },
+  toggleBtn: { background: 'none', border: 'none', color: '#1e3a5f', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },
 };
 
 // ============= LOADING =============
 function LoadingScreen({ message = 'Laden...' }: { message?: string }) {
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #1a3d0d 0%, #2d5a1e 40%, #61a229 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0d1b2a 0%, #1e3a5f 40%, #4da6ff 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <div style={{ fontSize: '3rem', marginBottom: 16 }}>🔧</div>
       <div style={{ fontSize: '1rem', fontWeight: 600 }}>{message}</div>
     </div>
@@ -191,47 +191,46 @@ function BoorAppShell({ userEmail }: { userEmail: string }) {
 const BOORAPP_CSS = `
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
-.header { background: #2d5a1e; color: white; padding: 18px 30px; display: flex; align-items: center; justify-content: space-between; }
+.header { background: #1e3a5f; color: white; padding: 18px 30px; display: flex; align-items: center; justify-content: space-between; }
 .header h1 { font-size: 22px; font-weight: 700; }
 .header .sub { font-size: 13px; opacity: 0.8; }
-.tabs { display: flex; background: #2d5a1e; }
+.tabs { display: flex; background: #163252; }
 .tab { padding: 12px 28px; color: rgba(255,255,255,0.7); cursor: pointer; font-size: 14px; font-weight: 500; border-bottom: 3px solid transparent; transition: all 0.2s; }
 .tab:hover { color: white; background: rgba(255,255,255,0.05); }
-.tab.active { color: white; border-bottom-color: #61a229; background: rgba(255,255,255,0.08); }
+.tab.active { color: white; border-bottom-color: #4da6ff; background: rgba(255,255,255,0.08); }
 .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 .two-col { display: grid; grid-template-columns: 1fr 420px; gap: 20px; align-items: start; }
 .panel { background: white; border-radius: 8px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-.panel h2 { font-size: 17px; color: #2d5a1e; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #e8ecf1; }
+.panel h2 { font-size: 17px; color: #1e3a5f; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #e8ecf1; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
 .form-row.full { grid-template-columns: 1fr; }
 .form-group { display: flex; flex-direction: column; }
 .form-group label { font-size: 12px; font-weight: 600; color: #555; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
 .form-group input, .form-group select { padding: 8px 10px; border: 1px solid #d0d5dd; border-radius: 5px; font-size: 14px; transition: border-color 0.2s; }
-.form-group input:focus, .form-group select:focus { outline: none; border-color: #61a229; box-shadow: 0 0 0 2px rgba(77,166,255,0.15); }
+.form-group input:focus, .form-group select:focus { outline: none; border-color: #4da6ff; box-shadow: 0 0 0 2px rgba(77,166,255,0.15); }
 .form-group input[readonly] { background: #f5f7fa; color: #666; }
 .toggle-group { display: flex; align-items: center; gap: 10px; padding-top: 20px; }
 .toggle { position: relative; width: 44px; height: 24px; cursor: pointer; }
 .toggle input { display: none; }
 .toggle .slider { position: absolute; inset: 0; background: #ccc; border-radius: 12px; transition: 0.3s; }
 .toggle .slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: 0.3s; }
-.toggle input:checked + .slider { background: #2d5a1e; }
+.toggle input:checked + .slider { background: #1e3a5f; }
 .toggle input:checked + .slider::before { transform: translateX(20px); }
 .cost-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f0f2f5; }
 .cost-row:last-child { border-bottom: none; }
 .cost-row .label { font-size: 13px; color: #555; flex: 1; }
 .cost-row .detail { font-size: 11px; color: #999; margin-left: 4px; }
-.cost-row input { width: 110px; text-align: right; padding: 5px 8px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 16px; font-weight: 500; }
-.cost-row input:focus { border-color: #61a229; outline: none; }
-.cost-row input[style*="flex"] { width: auto; text-align: left; }
-.cost-row .auto { font-size: 10px; color: #61a229; cursor: pointer; margin-left: 4px; }
-.cost-total { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 4px; margin-top: 8px; border-top: 3px solid #2d5a1e; }
-.cost-total .label { font-size: 16px; font-weight: 700; color: #2d5a1e; }
-.cost-total .amount { font-size: 22px; font-weight: 700; color: #2d5a1e; }
+.cost-row input { width: 110px; text-align: right; padding: 5px 8px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 14px; font-weight: 500; }
+.cost-row input:focus { border-color: #4da6ff; outline: none; }
+.cost-row .auto { font-size: 10px; color: #4da6ff; cursor: pointer; margin-left: 4px; }
+.cost-total { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 4px; margin-top: 8px; border-top: 3px solid #1e3a5f; }
+.cost-total .label { font-size: 16px; font-weight: 700; color: #1e3a5f; }
+.cost-total .amount { font-size: 22px; font-weight: 700; color: #1e3a5f; }
 .btn { padding: 10px 20px; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-.btn-primary { background: #61a229; color: white; }
-.btn-primary:hover { background: #4e8221; }
+.btn-primary { background: #1e3a5f; color: white; }
+.btn-primary:hover { background: #2a4f7f; }
 .btn-success { background: #2e7d32; color: white; }
 .btn-success:hover { background: #388e3c; }
 .btn-danger { background: #c62828; color: white; }
@@ -239,23 +238,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .btn-sm { padding: 6px 14px; font-size: 12px; }
 .btn-group { display: flex; gap: 10px; margin-top: 16px; }
 table { width: 100%; border-collapse: collapse; }
-th { background: #2d5a1e; color: white; padding: 10px 12px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+th { background: #1e3a5f; color: white; padding: 10px 12px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
 td { padding: 10px 12px; border-bottom: 1px solid #e8ecf1; font-size: 13px; }
 tr:nth-child(even) { background: #f8f9fb; }
-tr:hover { background: #f1f8e9; }
+tr:hover { background: #eef3fa; }
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
 .modal-overlay.active { display: flex; }
 .modal { background: white; border-radius: 10px; padding: 28px; width: 500px; max-width: 95vw; max-height: 90vh; overflow-y: auto; }
-.modal h3 { font-size: 18px; color: #2d5a1e; margin-bottom: 16px; }
+.modal h3 { font-size: 18px; color: #1e3a5f; margin-bottom: 16px; }
 .empty-state { text-align: center; padding: 40px; color: #999; }
 .empty-state p { font-size: 15px; }
 .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-.badge-blue { background: #e8f5e9; color: #2d5a1e; }
+.badge-blue { background: #e3f2fd; color: #1565c0; }
 .offerte-card { background: white; border-radius: 8px; padding: 16px 20px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: box-shadow 0.2s; }
 .offerte-card:hover { box-shadow: 0 3px 8px rgba(0,0,0,0.15); }
-.offerte-info h3 { font-size: 15px; color: #2d5a1e; }
+.offerte-info h3 { font-size: 15px; color: #1e3a5f; }
 .offerte-info p { font-size: 12px; color: #888; margin-top: 3px; }
-.offerte-amount { font-size: 18px; font-weight: 700; color: #2d5a1e; }
+.offerte-amount { font-size: 18px; font-weight: 700; color: #1e3a5f; }
 .offerte-actions { display: flex; gap: 6px; margin-left: 12px; }
 @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
 
@@ -389,8 +388,8 @@ const BOORAPP_HTML = `
               <button class="btn btn-primary" style="padding:6px 14px; font-size:12px; background:#2d7d46;" onclick="startWKO()">🌍 WKO Rapport</button>
               <span id="wko-status" style="font-size:11px; color:#666;"></span>
             </div>
-            <div id="wko-progress" style="display:none; margin-top:8px; padding:10px; background:#f1f8e9; border-radius:6px; border:1px solid #c8e6c9;">
-              <div style="font-size:12px; font-weight:600; color:#2d5a1e; margin-bottom:6px;">WKO Tool</div>
+            <div id="wko-progress" style="display:none; margin-top:8px; padding:10px; background:#f0f7ff; border-radius:6px; border:1px solid #d0e3f7;">
+              <div style="font-size:12px; font-weight:600; color:#1e3a5f; margin-bottom:6px;">WKO Tool</div>
               <div id="wko-log" style="font-size:11px; color:#555; max-height:120px; overflow-y:auto;"></div>
               <div id="wko-result" style="margin-top:8px; display:none;"></div>
             </div>
@@ -434,12 +433,8 @@ const BOORAPP_HTML = `
         <h2>Kostenberekening</h2>
         <div id="cost-rows"></div>
         <div id="custom-cost-rows"></div>
-        <div style="margin-top:8px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-          <button class="btn btn-sm btn-primary" onclick="addCustomArtikel()" style="font-size:11px; padding:5px 12px;">+ Eigen regel</button>
-          <select id="artikel-bib-select" onchange="addFromBibliotheek(this)" style="font-size:12px; padding:4px 8px; border:1px solid #d0d5dd; border-radius:4px; color:#666;">
-            <option value="">📚 Uit bibliotheek...</option>
-          </select>
-          <button class="btn btn-sm" onclick="openArtikelBibModal()" style="font-size:10px; padding:4px 8px; background:#f5f7fa; border:1px solid #d0d5dd;" title="Bibliotheek beheren">⚙️</button>
+        <div style="margin-top:8px;">
+          <button class="btn btn-sm btn-primary" onclick="addCustomArtikel()" style="font-size:11px; padding:5px 12px;">+ Artikel toevoegen</button>
         </div>
         <div class="cost-total">
           <span class="label">TOTAAL EXCL. BTW</span>
@@ -472,14 +467,7 @@ const BOORAPP_HTML = `
   <!-- TAB: OPGESLAGEN OFFERTES -->
   <div id="tab-opgeslagen" class="tab-content">
     <div class="panel">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-        <h2 style="margin:0;border:none;padding:0;">Opgeslagen Offertes</h2>
-      </div>
-      <div style="margin-bottom:12px;">
-        <input type="text" id="offerte-zoek" placeholder="🔍 Zoek op kenmerk, klant, locatie..." 
-               oninput="renderOffertes()" 
-               style="width:100%; padding:10px 14px; font-size:15px; border:1px solid #d0d5dd; border-radius:6px;">
-      </div>
+      <h2>Opgeslagen Offertes</h2>
       <div id="offertes-list"></div>
     </div>
   </div>
@@ -492,7 +480,7 @@ const BOORAPP_HTML = `
       <div>
         <div class="panel">
           <h2>Plan van Aanpak BRL2100 / BRL11000</h2>
-          <div style="margin-bottom:10px; padding:8px 12px; background:#e8f5e9; border-radius:6px; font-size:12px; color:#2d5a1e;">
+          <div style="margin-bottom:10px; padding:8px 12px; background:#e3f2fd; border-radius:6px; font-size:12px; color:#1565c0;">
             💡 Data wordt automatisch overgenomen uit de offerte. Alle 7 BRL-eisen + risico-analyse.
           </div>
           <div class="form-row">
@@ -585,17 +573,17 @@ const BOORAPP_HTML = `
             </div>
           </div>
           <!-- Visuele Boorstaat GeoTOP -->
-          <div style="margin-top:12px; padding:12px 16px; background:#f1f8e9; border-radius:6px; border:1px solid #c8e6c9;">
+          <div style="margin-top:12px; padding:12px 16px; background:#f0f7ff; border-radius:6px; border:1px solid #d0e3f7;">
             <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
               <div>
-                <strong style="font-size:13px; color:#2d5a1e;">📊 Visuele Boorstaat (GeoTOP v1.6.1)</strong>
+                <strong style="font-size:13px; color:#1e3a5f;">📊 Visuele Boorstaat (GeoTOP v1.6.1)</strong>
                 <div style="font-size:11px; color:#888; margin-top:2px;">Haalt bodemopbouw op via TNO/DINOloket op basis van het adres hierboven</div>
               </div>
               <div style="display:flex; gap:6px; flex-wrap:wrap;">
                 <button class="btn btn-primary" onclick="fetchBoorstaat()" style="font-size:12px; padding:6px 14px;">🔄 Boorstaat ophalen</button>
                 <button class="btn btn-secondary" onclick="setBoorstaatView('shallow')" id="pva-bs-shallow" style="font-size:11px; padding:5px 10px;">0–10m</button>
                 <button class="btn btn-secondary" onclick="setBoorstaatView('deep')" id="pva-bs-deep" style="font-size:11px; padding:5px 10px;">0–max</button>
-                <button class="btn btn-secondary" onclick="setBoorstaatView('both')" id="pva-bs-both" style="font-size:11px; padding:5px 10px; border:2px solid #2d5a1e;">Beide</button>
+                <button class="btn btn-secondary" onclick="setBoorstaatView('both')" id="pva-bs-both" style="font-size:11px; padding:5px 10px; border:2px solid #1e3a5f;">Beide</button>
               </div>
             </div>
             <div id="pva-bs-info" style="display:none; font-size:12px; color:#555; margin-bottom:8px;"></div>
@@ -1070,7 +1058,7 @@ const BOORAPP_HTML = `
             ✅ Data wordt automatisch overgenomen uit de offerte/PvA. Vul alleen de brongegevens en meetwaarden in.
           </div>
 
-          <h3 style="color:#2d5a1e; margin:16px 0 8px; font-size:14px;">Projectgegevens</h3>
+          <h3 style="color:#1e3a5f; margin:16px 0 8px; font-size:14px;">Projectgegevens</h3>
           <div class="form-row">
             <div class="form-group"><label>Klantnaam</label><input type="text" id="opl-klant" placeholder="Klantnaam"></div>
             <div class="form-group"><label>Projectnummer</label><input type="text" id="opl-projectnr" placeholder="35-2025-009"></div>
@@ -1087,7 +1075,7 @@ const BOORAPP_HTML = `
             <div class="form-group"><label>Ons kenmerk</label><input type="text" id="opl-kenmerk" placeholder="35-2025-009"></div>
           </div>
 
-          <h3 style="color:#2d5a1e; margin:16px 0 8px; font-size:14px;">Systeemgegevens</h3>
+          <h3 style="color:#1e3a5f; margin:16px 0 8px; font-size:14px;">Systeemgegevens</h3>
           <div class="form-row">
             <div class="form-group"><label>Aantal bronnen</label>
               <div style="display:flex; align-items:center; gap:6px;">
@@ -1139,13 +1127,13 @@ const BOORAPP_HTML = `
       <!-- RECHTER KOLOM -->
       <div>
         <div class="panel">
-          <h3 style="color:#2d5a1e; margin:0 0 12px; font-size:14px;">Brongegevens</h3>
+          <h3 style="color:#1e3a5f; margin:0 0 12px; font-size:14px;">Brongegevens</h3>
           <div style="margin-bottom:8px; font-size:11px; color:#888;">Vul per bron de naam, diepte en druktest-resultaten in.</div>
           <div id="opl-bron-tabel"></div>
         </div>
 
         <div class="panel" style="margin-top:16px;">
-          <h3 style="color:#2d5a1e; margin:0 0 12px; font-size:14px;">Druktest & Oplevering</h3>
+          <h3 style="color:#1e3a5f; margin:0 0 12px; font-size:14px;">Druktest & Oplevering</h3>
           <div class="form-row">
             <div class="form-group"><label>Druktest druk (bar)</label><input type="text" id="opl-druktestbar" value="6"></div>
             <div class="form-group"><label>Druktest duur (min)</label><input type="text" id="opl-druktestmin" value="30"></div>
@@ -1167,7 +1155,7 @@ const BOORAPP_HTML = `
         </div>
 
         <div class="panel" style="margin-top:16px;">
-          <h3 style="color:#2d5a1e; margin:0 0 12px; font-size:14px;">Garantie & Oplevering</h3>
+          <h3 style="color:#1e3a5f; margin:0 0 12px; font-size:14px;">Garantie & Oplevering</h3>
           <div class="form-row">
             <div class="form-group"><label>Garantie horizontaal</label><input type="text" id="opl-garantie-h" value="10 jaar"></div>
             <div class="form-group"><label>Garantie verticaal</label><input type="text" id="opl-garantie-v" value="25 jaar"></div>
@@ -1188,8 +1176,8 @@ const BOORAPP_HTML = `
         </div>
 
         <div class="panel" style="margin-top:16px;">
-          <h3 style="color:#2d5a1e; margin:0 0 12px; font-size:14px;">📸 Foto's</h3>
-          <div id="opl-foto-drop" ondrop="handleFotoDrop(event)" ondragover="event.preventDefault(); this.style.borderColor='#2d5a1e'; this.style.background='#e8f5e9';" ondragleave="this.style.borderColor='#d0d5dd'; this.style.background='#f8f9fb';"
+          <h3 style="color:#1e3a5f; margin:0 0 12px; font-size:14px;">📸 Foto's</h3>
+          <div id="opl-foto-drop" ondrop="handleFotoDrop(event)" ondragover="event.preventDefault(); this.style.borderColor='#1e3a5f'; this.style.background='#e3f2fd';" ondragleave="this.style.borderColor='#d0d5dd'; this.style.background='#f8f9fb';"
             style="border:2px dashed #d0d5dd; border-radius:8px; padding:24px; text-align:center; cursor:pointer; background:#f8f9fb; transition:all 0.2s;"
             onclick="document.getElementById('opl-foto-input').click()">
             <div style="font-size:28px; margin-bottom:6px;">📷</div>
@@ -1201,8 +1189,8 @@ const BOORAPP_HTML = `
         </div>
 
         <div class="panel" style="margin-top:16px;">
-          <h3 style="color:#2d5a1e; margin:0 0 12px; font-size:14px;">🗺️ Boortekening</h3>
-          <div id="opl-tekening-drop" ondrop="handleTekeningDrop(event)" ondragover="event.preventDefault(); this.style.borderColor='#2d5a1e'; this.style.background='#e8f5e9';" ondragleave="this.style.borderColor='#d0d5dd'; this.style.background='#f8f9fb';"
+          <h3 style="color:#1e3a5f; margin:0 0 12px; font-size:14px;">🗺️ Boortekening</h3>
+          <div id="opl-tekening-drop" ondrop="handleTekeningDrop(event)" ondragover="event.preventDefault(); this.style.borderColor='#1e3a5f'; this.style.background='#e3f2fd';" ondragleave="this.style.borderColor='#d0d5dd'; this.style.background='#f8f9fb';"
             style="border:2px dashed #d0d5dd; border-radius:8px; padding:24px; text-align:center; cursor:pointer; background:#f8f9fb; transition:all 0.2s;"
             onclick="document.getElementById('opl-tekening-input').click()">
             <div style="font-size:28px; margin-bottom:6px;">📐</div>
@@ -1221,23 +1209,6 @@ const BOORAPP_HTML = `
     </div>
   </div>
 
-</div>
-
-<!-- MODAL: ARTIKELEN BIBLIOTHEEK -->
-<div class="modal-overlay" id="artikel-bib-modal">
-  <div class="modal" style="max-width:500px;">
-    <h3>📚 Artikelenbibliotheek</h3>
-    <p style="font-size:12px; color:#666; margin-bottom:12px;">Bewaar veelgebruikte artikelen zodat je ze snel kunt hergebruiken.</p>
-    <div style="margin-bottom:12px; display:flex; gap:6px;">
-      <input type="text" id="bib-new-naam" placeholder="Artikel naam" style="flex:1; padding:8px; font-size:14px; border:1px solid #d0d5dd; border-radius:4px;">
-      <input type="text" id="bib-new-bedrag" placeholder="€ bedrag" inputmode="decimal" style="width:100px; padding:8px; font-size:14px; border:1px solid #d0d5dd; border-radius:4px; text-align:right;">
-      <button class="btn btn-primary btn-sm" onclick="addToBibliotheek()" style="white-space:nowrap;">+ Toevoegen</button>
-    </div>
-    <div id="bib-list" style="max-height:300px; overflow-y:auto;"></div>
-    <div class="btn-group" style="margin-top:12px;">
-      <button class="btn btn-danger" onclick="closeArtikelBibModal()">Sluiten</button>
-    </div>
-  </div>
 </div>
 
 <!-- MODAL: KLANT TOEVOEGEN/BEWERKEN -->
@@ -1264,6 +1235,3 @@ const BOORAPP_HTML = `
 </div>
 
 `;
-
-
-

@@ -835,45 +835,15 @@ function renderCustomArtikelen() {
     const row = document.createElement('div');
     row.className = 'cost-row';
     row.style.cssText = 'border-left:3px solid #2e7d32;';
-
-    const naamInput = document.createElement('input');
-    naamInput.type = 'text';
-    naamInput.value = art.naam;
-    naamInput.placeholder = 'Omschrijving...';
-    naamInput.autocomplete = 'off';
-    naamInput.spellcheck = false;
-    naamInput.setAttribute('autocorrect', 'off');
-    naamInput.style.cssText = 'flex:1; min-width:0; margin-right:8px; font-size:16px; padding:8px; border:1px solid #e0e0e0; border-radius:4px;';
-    naamInput.addEventListener('input', function() { art.naam = this.value; });
-
-    const bedragInput = document.createElement('input');
-    bedragInput.type = 'text';
-    bedragInput.value = art.bedrag ? eur(art.bedrag) : '';
-    bedragInput.placeholder = '€ 0,00';
-    bedragInput.inputMode = 'decimal';
-    bedragInput.autocomplete = 'off';
-    bedragInput.style.cssText = 'width:100px; text-align:right; font-size:16px; padding:8px; border:1px solid #e0e0e0; border-radius:4px;';
-    bedragInput.addEventListener('input', function() { art.bedrag = parseEur(this.value); updateTotal(); });
-    bedragInput.addEventListener('focus', function() { this.select(); });
-
-    const starBtn = document.createElement('span');
-    starBtn.className = 'auto';
-    starBtn.textContent = '⭐';
-    starBtn.title = 'Bewaar in bibliotheek';
-    starBtn.style.cssText = 'color:#61a229; font-size:16px; padding:4px; cursor:pointer;';
-    starBtn.addEventListener('click', function() { saveToArtikelBib(art.naam, art.bedrag); });
-
-    const delBtn = document.createElement('span');
-    delBtn.className = 'auto';
-    delBtn.textContent = '✕';
-    delBtn.title = 'Verwijderen';
-    delBtn.style.cssText = 'color:#c62828; font-size:18px; padding:4px 8px; cursor:pointer;';
-    delBtn.addEventListener('click', function() { removeCustomArtikel(art.id); });
-
-    row.appendChild(naamInput);
-    row.appendChild(bedragInput);
-    row.appendChild(starBtn);
-    row.appendChild(delBtn);
+    row.innerHTML = `
+      <input type="text" value="${art.naam}" placeholder="Omschrijving..." 
+             oninput="customArtikelen.find(a=>a.id===${art.id}).naam=this.value" 
+             style="flex:1; margin-right:8px; font-size:13px;">
+      <input type="text" value="${art.bedrag ? eur(art.bedrag) : ''}" placeholder="€ 0,00"
+             oninput="customArtikelen.find(a=>a.id===${art.id}).bedrag=parseEur(this.value); updateTotal();" 
+             onfocus="this.select()" style="width:100px; text-align:right;">
+      <span class="auto" onclick="removeCustomArtikel(${art.id})" title="Verwijderen" style="color:#c62828; font-size:14px;">✕</span>
+    `;
     container.appendChild(row);
   });
 }
@@ -881,7 +851,7 @@ function renderCustomArtikelen() {
 function paramRow(label, inputs) {
   const row = document.createElement('div');
   row.className = 'cost-row';
-  row.style.cssText = 'padding-left:20px; background:#f8f9fb; border-left:3px solid #61a229;';
+  row.style.cssText = 'padding-left:20px; background:#f8f9fb; border-left:3px solid #4da6ff;';
   row.innerHTML = `<span class="label" style="font-size:12px; color:#666;">${label}</span>${inputs}`;
   return row;
 }
@@ -1329,78 +1299,40 @@ function gatherOfferteData() {
   };
 }
 
-let editingOfferteId = null;
-
 function saveOfferte() {
   const data = gatherOfferteData();
   if (!data.kenmerk) { alert('Vul een kenmerk in'); return; }
-  
-  // Save cost parameters too
-  data.costParams = JSON.parse(JSON.stringify(costParams));
-  
-  const offertes = getOffertes();
-  
-  if (editingOfferteId) {
-    // Update existing
-    const idx = offertes.findIndex(o => o.id === editingOfferteId);
-    if (idx >= 0) {
-      data.id = editingOfferteId;
-      data.savedAt = offertes[idx].savedAt;
-      data.updatedAt = new Date().toISOString();
-      offertes[idx] = data;
-      saveOffertes(offertes);
-      editingOfferteId = null;
-      alert('Offerte bijgewerkt!');
-      return;
-    }
-  }
-  
   data.id = Date.now();
   data.savedAt = new Date().toISOString();
+  const offertes = getOffertes();
   offertes.unshift(data);
   saveOffertes(offertes);
-  editingOfferteId = null;
   alert('Offerte opgeslagen!');
 }
 
 function renderOffertes() {
   const list = document.getElementById('offertes-list');
   const offertes = getOffertes();
-  const zoek = (document.getElementById('offerte-zoek')?.value || '').toLowerCase();
-  
-  const filtered = offertes.filter(o => {
-    if (!zoek) return true;
-    return (o.kenmerk || '').toLowerCase().includes(zoek) ||
-           (o.klantNaam || '').toLowerCase().includes(zoek) ||
-           (o.locatie || '').toLowerCase().includes(zoek) ||
-           (o.betreft || '').toLowerCase().includes(zoek);
-  });
-  
-  if (!filtered.length) {
-    list.innerHTML = zoek 
-      ? '<div class="empty-state"><p>Geen offertes gevonden</p></div>'
-      : '<div class="empty-state"><p>Nog geen opgeslagen offertes</p></div>';
+  if (!offertes.length) {
+    list.innerHTML = '<div class="empty-state"><p>Nog geen opgeslagen offertes</p></div>';
     return;
   }
   list.innerHTML = '';
-  filtered.forEach((o) => {
-    const idx = offertes.indexOf(o);
+  offertes.forEach((o, idx) => {
     const card = document.createElement('div');
     card.className = 'offerte-card';
     const d = o.datum || o.savedAt?.substring(0, 10) || '';
-    const updated = o.updatedAt ? ' · ✏️ bewerkt' : '';
     card.innerHTML = `
       <div class="offerte-info">
         <h3>${o.kenmerk || 'Geen kenmerk'} — ${o.klantNaam || 'Onbekend'}</h3>
-        <p>${d} · ${o.betreft || ''} · ${o.meters || 0}m${updated}</p>
+        <p>${d} · ${o.betreft || ''} · ${o.meters || 0}m</p>
       </div>
       <div style="display:flex;align-items:center;gap:12px;">
         <span class="offerte-amount">${eur(o.total)}</span>
         <div class="offerte-actions">
-          <button class="btn btn-primary btn-sm" onclick="loadOfferte(${idx})" title="Openen & bewerken">📂 Open</button>
-          <button class="btn btn-sm" onclick="duplicateOfferte(${idx})" title="Dupliceren" style="background:#f5f7fa; border:1px solid #d0d5dd;">📋</button>
-          <button class="btn btn-success btn-sm" onclick="pdfFromSaved(${idx})" title="PDF genereren">📄 PDF</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteOfferte(${idx})" title="Verwijderen">🗑️</button>
+          <button class="btn btn-primary btn-sm" onclick="loadOfferte(${idx})">📂 Open</button>
+          <button class="btn btn-success btn-sm" onclick="pdfFromSaved(${idx})">📄 PDF</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteOfferte(${idx})">🗑️</button>
         </div>
       </div>`;
     list.appendChild(card);
@@ -1410,9 +1342,6 @@ function renderOffertes() {
 function loadOfferte(idx) {
   const o = getOffertes()[idx];
   if (!o) return;
-  
-  editingOfferteId = o.id;
-  
   document.getElementById('f-klant').value = o.klantId || '';
   document.getElementById('f-tav').value = o.tav || '';
   document.getElementById('f-kenmerk').value = o.kenmerk || '';
@@ -1431,45 +1360,13 @@ function loadOfferte(idx) {
   document.getElementById('f-telefoon').value = o.telefoon || '';
   document.getElementById('f-bevoegd').value = o.bevoegd || '';
 
-  // Restore cost parameters if saved
-  if (o.costParams) {
-    costParams = JSON.parse(JSON.stringify(o.costParams));
-    // Update param UI fields
-    const pe = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-    pe('param-boor-ppm', eur(costParams.boorkosten.prijsPerMeter));
-    pe('param-grout-zakken', costParams.grout.aantalZakken || '');
-    pe('param-grout-prijs', eur(costParams.grout.prijsPerZak));
-    pe('param-gewichten-aantal', costParams.gewichten.aantal);
-    pe('param-gewichten-prijs', eur(costParams.gewichten.prijsPerStuk));
-    pe('param-verdelerput-prijs', eur(costParams.verdelerput.prijs));
-    pe('param-aansluiten-prijs', eur(costParams.aansluiten.prijs));
-    pe('param-glycol-liters', costParams.glycol.liters || '');
-    pe('param-glycol-prijs', eur(costParams.glycol.prijsPerLiter));
-    pe('param-graafwerk-prijs', eur(costParams.graafwerk.prijs));
-    pe('param-transport-prijs', eur(costParams.transport?.prijs || 1000));
-    pe('param-barogel-zakken', costParams.barogel.aantalZakken || '');
-    pe('param-barogel-prijs', eur(costParams.barogel.prijsPerZak));
-    pe('param-olo-prijs', eur(costParams.olo?.prijs || 200));
-  }
-
-  // Restore custom artikelen
-  customArtikelen = [];
-  customArtikelCounter = 0;
-  if (o.customArtikelen && o.customArtikelen.length) {
-    o.customArtikelen.forEach(art => {
-      addCustomArtikel(art.naam, art.bedrag);
-    });
-  } else {
-    renderCustomArtikelen();
-  }
-
   // Set cost overrides
   costOverrides = {};
   if (o.costs) {
     COST_ITEMS.forEach(item => {
       costOverrides[item.key] = true;
     });
-    calc();
+    calc(); // calc first to set details
     COST_ITEMS.forEach(item => {
       if (o.costs[item.key] !== undefined) {
         costOverrides[item.key] = true;
@@ -1494,110 +1391,6 @@ function deleteOfferte(idx) {
 function pdfFromSaved(idx) {
   loadOfferte(idx);
   setTimeout(() => generatePDF(), 200);
-}
-
-function duplicateOfferte(idx) {
-  const offertes = getOffertes();
-  const o = JSON.parse(JSON.stringify(offertes[idx]));
-  o.id = Date.now();
-  o.kenmerk = (o.kenmerk || '') + ' (kopie)';
-  o.savedAt = new Date().toISOString();
-  delete o.updatedAt;
-  offertes.unshift(o);
-  saveOffertes(offertes);
-  renderOffertes();
-}
-
-// ============================================================
-// ARTIKELEN BIBLIOTHEEK
-// ============================================================
-const ARTIKEL_BIB_KEY = 'gr_artikel_bibliotheek';
-
-function getArtikelBib() { return JSON.parse(localStorage.getItem(ARTIKEL_BIB_KEY) || '[]'); }
-function saveArtikelBib(arr) { localStorage.setItem(ARTIKEL_BIB_KEY, JSON.stringify(arr)); }
-
-function populateArtikelBibSelect() {
-  const sel = document.getElementById('artikel-bib-select');
-  if (!sel) return;
-  const bib = getArtikelBib();
-  sel.innerHTML = '<option value="">📚 Uit bibliotheek...</option>';
-  bib.forEach((item, i) => {
-    sel.innerHTML += `<option value="${i}">${item.naam} (${eur(item.bedrag)})</option>`;
-  });
-}
-
-function addFromBibliotheek(sel) {
-  const idx = parseInt(sel.value);
-  if (isNaN(idx)) return;
-  const bib = getArtikelBib();
-  const item = bib[idx];
-  if (item) {
-    addCustomArtikel(item.naam, item.bedrag);
-    updateTotal();
-  }
-  sel.value = '';
-}
-
-function saveToArtikelBib(naam, bedrag) {
-  if (!naam) return;
-  const bib = getArtikelBib();
-  // Check if already exists
-  const existing = bib.findIndex(b => b.naam.toLowerCase() === naam.toLowerCase());
-  if (existing >= 0) {
-    bib[existing].bedrag = bedrag;
-  } else {
-    bib.push({ naam, bedrag: bedrag || 0 });
-  }
-  saveArtikelBib(bib);
-  populateArtikelBibSelect();
-}
-
-function addToBibliotheek() {
-  const naam = document.getElementById('bib-new-naam').value.trim();
-  const bedrag = parseEur(document.getElementById('bib-new-bedrag').value);
-  if (!naam) { alert('Vul een naam in'); return; }
-  saveToArtikelBib(naam, bedrag);
-  document.getElementById('bib-new-naam').value = '';
-  document.getElementById('bib-new-bedrag').value = '';
-  renderArtikelBib();
-}
-
-function removeFromBibliotheek(idx) {
-  const bib = getArtikelBib();
-  bib.splice(idx, 1);
-  saveArtikelBib(bib);
-  populateArtikelBibSelect();
-  renderArtikelBib();
-}
-
-function renderArtikelBib() {
-  const list = document.getElementById('bib-list');
-  if (!list) return;
-  const bib = getArtikelBib();
-  if (!bib.length) {
-    list.innerHTML = '<p style="color:#999; font-size:13px; text-align:center; padding:20px;">Nog geen artikelen bewaard</p>';
-    return;
-  }
-  list.innerHTML = '';
-  bib.forEach((item, i) => {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f0f2f5;';
-    row.innerHTML = `
-      <span style="font-size:14px; flex:1;">${item.naam}</span>
-      <span style="font-size:14px; font-weight:600; margin-right:12px;">${eur(item.bedrag)}</span>
-      <span onclick="removeFromBibliotheek(${i})" style="color:#c62828; cursor:pointer; font-size:14px;" title="Verwijderen">✕</span>
-    `;
-    list.appendChild(row);
-  });
-}
-
-function openArtikelBibModal() {
-  document.getElementById('artikel-bib-modal').classList.add('active');
-  renderArtikelBib();
-}
-
-function closeArtikelBibModal() {
-  document.getElementById('artikel-bib-modal').classList.remove('active');
 }
 
 // ============================================================
@@ -2209,9 +2002,6 @@ function init() {
 
   // Attach auto-save listeners
   attachAutoSave();
-
-  // Populate artikel bibliotheek dropdown
-  populateArtikelBibSelect();
 }
 
 // ============================================================
@@ -2779,7 +2569,7 @@ async function fetchBoorstaat() {
   if (!addr) { alert('Vul eerst een adres in bij "Locatie opdracht"'); return; }
 
   document.getElementById('pva-bs-log').textContent = '';
-  document.getElementById('pva-bs-area').innerHTML = '<div style="color:#888; padding:20px; text-align:center;"><span style="display:inline-block;width:18px;height:18px;border:3px solid #e8ecf1;border-top-color:#2d5a1e;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px;"></span>Bezig met ophalen...</div>';
+  document.getElementById('pva-bs-area').innerHTML = '<div style="color:#888; padding:20px; text-align:center;"><span style="display:inline-block;width:18px;height:18px;border:3px solid #e8ecf1;border-top-color:#1e3a5f;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px;"></span>Bezig met ophalen...</div>';
 
   try {
     bsLog('📍 Adres opzoeken via PDOK...');
@@ -2844,7 +2634,7 @@ function setBoorstaatView(v) {
   bsView = v;
   ['shallow','deep','both'].forEach(k => {
     const b = document.getElementById('pva-bs-' + k);
-    b.style.border = k === v ? '2px solid #2d5a1e' : '';
+    b.style.border = k === v ? '2px solid #1e3a5f' : '';
   });
   renderPvaBoorstaat();
 }
@@ -2874,7 +2664,7 @@ function drawBsCanvas(data, depthFrom, depthTo) {
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
 
   // Title
-  ctx.fillStyle = '#2d5a1e'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillStyle = '#1e3a5f'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
   ctx.fillText(`${data.locationName}`, W / 2, 16);
   ctx.font = '10px sans-serif'; ctx.fillStyle = '#666';
   ctx.fillText(`RD: ${data.rdX}, ${data.rdY} | MV: ${data.maaiveldNAP.toFixed(2)} m NAP | ${depthFrom}–${depthTo} m`, W / 2, 30);
@@ -2896,7 +2686,7 @@ function drawBsCanvas(data, depthFrom, depthTo) {
   }
 
   // Column headers
-  ctx.fillStyle = '#2d5a1e'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillStyle = '#1e3a5f'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
   ctx.fillText('Lithoklasse', x0 + BAR_W / 2, y0 - 6);
   ctx.fillText('Geol. eenh.', sx + STRAT_W / 2, y0 - 6);
 
@@ -3266,7 +3056,7 @@ function renderBronTabel() {
     const tijd = existing['opl-bron-'+i+'-tijd'] || '20';
     const druktest = existing['opl-bron-'+i+'-druktestbar'] || '3';
     html += `<tr>
-      <td style="padding:3px 4px; font-weight:600; color:#2d5a1e;">${i}</td>
+      <td style="padding:3px 4px; font-weight:600; color:#1e3a5f;">${i}</td>
       <td style="padding:3px 2px;"><input type="text" id="opl-bron-${i}-naam" value="${existing['opl-bron-'+i+'-naam'] || 'Bron '+i}" style="width:80px; padding:3px 4px; border:1px solid #d0d5dd; border-radius:3px; font-size:11px;"></td>
       <td style="padding:3px 2px;"><input type="text" id="opl-bron-${i}-diepte" value="${diepte}" placeholder="m" style="width:45px; padding:3px 4px; border:1px solid #d0d5dd; border-radius:3px; font-size:11px; text-align:right;"></td>
       <td style="padding:3px 2px;"><input type="text" id="opl-bron-${i}-pomdruk" value="${pomdruk}" style="width:35px; padding:3px 4px; border:1px solid #d0d5dd; border-radius:3px; font-size:11px; text-align:right;"> bar</td>
@@ -3656,4 +3446,3 @@ function generateOpleverPDF() {
   const oplProject = ((p.projectnr || '') + (p.locatie ? '-' + p.locatie : '')).trim() || 'draft';
   uploadToDropbox(pdf, filename, p.klant || '', oplProject, 'Opleverrapport');
 }
-
