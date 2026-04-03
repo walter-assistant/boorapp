@@ -3384,8 +3384,6 @@ function generateOpleverPDF() {
       } catch(e) { console.error('Boortekening error:', e); }
       y += imgH + 6;
     }
-
-        }
   }
 
   // ===================== FOTO'S =====================
