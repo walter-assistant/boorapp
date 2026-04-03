@@ -838,11 +838,13 @@ function renderCustomArtikelen() {
     row.innerHTML = `
       <input type="text" value="${art.naam}" placeholder="Omschrijving..." 
              oninput="customArtikelen.find(a=>a.id===${art.id}).naam=this.value" 
-             style="flex:1; margin-right:8px; font-size:13px;">
+             autocomplete="off" autocorrect="off" spellcheck="false"
+             style="flex:1; min-width:0; margin-right:8px; font-size:16px; padding:8px;">
       <input type="text" value="${art.bedrag ? eur(art.bedrag) : ''}" placeholder="€ 0,00"
              oninput="customArtikelen.find(a=>a.id===${art.id}).bedrag=parseEur(this.value); updateTotal();" 
-             onfocus="this.select()" style="width:100px; text-align:right;">
-      <span class="auto" onclick="removeCustomArtikel(${art.id})" title="Verwijderen" style="color:#c62828; font-size:14px;">✕</span>
+             onfocus="this.select()" inputmode="decimal" autocomplete="off"
+             style="width:100px; text-align:right; font-size:16px; padding:8px;">
+      <span class="auto" onclick="removeCustomArtikel(${art.id})" title="Verwijderen" style="color:#c62828; font-size:18px; padding:4px 8px; cursor:pointer;">✕</span>
     `;
     container.appendChild(row);
   });

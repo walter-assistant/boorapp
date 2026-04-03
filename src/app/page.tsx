@@ -222,8 +222,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .cost-row:last-child { border-bottom: none; }
 .cost-row .label { font-size: 13px; color: #555; flex: 1; }
 .cost-row .detail { font-size: 11px; color: #999; margin-left: 4px; }
-.cost-row input { width: 110px; text-align: right; padding: 5px 8px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 14px; font-weight: 500; }
+.cost-row input { width: 110px; text-align: right; padding: 5px 8px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 16px; font-weight: 500; }
 .cost-row input:focus { border-color: #4da6ff; outline: none; }
+.cost-row input[style*="flex"] { width: auto; text-align: left; }
 .cost-row .auto { font-size: 10px; color: #4da6ff; cursor: pointer; margin-left: 4px; }
 .cost-total { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 4px; margin-top: 8px; border-top: 3px solid #1e3a5f; }
 .cost-total .label { font-size: 16px; font-weight: 700; color: #1e3a5f; }
