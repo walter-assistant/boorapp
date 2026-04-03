@@ -835,18 +835,45 @@ function renderCustomArtikelen() {
     const row = document.createElement('div');
     row.className = 'cost-row';
     row.style.cssText = 'border-left:3px solid #2e7d32;';
-    row.innerHTML = `
-      <input type="text" value="${art.naam}" placeholder="Omschrijving..." 
-             oninput="customArtikelen.find(a=>a.id===${art.id}).naam=this.value" 
-             autocomplete="off" autocorrect="off" spellcheck="false"
-             style="flex:1; min-width:0; margin-right:8px; font-size:16px; padding:8px;">
-      <input type="text" value="${art.bedrag ? eur(art.bedrag) : ''}" placeholder="€ 0,00"
-             oninput="customArtikelen.find(a=>a.id===${art.id}).bedrag=parseEur(this.value); updateTotal();" 
-             onfocus="this.select()" inputmode="decimal" autocomplete="off"
-             style="width:100px; text-align:right; font-size:16px; padding:8px;">
-      <span class="auto" onclick="saveToArtikelBib(customArtikelen.find(a=>a.id===${art.id}).naam, customArtikelen.find(a=>a.id===${art.id}).bedrag)" title="Bewaar in bibliotheek" style="color:#61a229; font-size:16px; padding:4px; cursor:pointer;">⭐</span>
-      <span class="auto" onclick="removeCustomArtikel(${art.id})" title="Verwijderen" style="color:#c62828; font-size:18px; padding:4px 8px; cursor:pointer;">✕</span>
-    `;
+
+    const naamInput = document.createElement('input');
+    naamInput.type = 'text';
+    naamInput.value = art.naam;
+    naamInput.placeholder = 'Omschrijving...';
+    naamInput.autocomplete = 'off';
+    naamInput.spellcheck = false;
+    naamInput.setAttribute('autocorrect', 'off');
+    naamInput.style.cssText = 'flex:1; min-width:0; margin-right:8px; font-size:16px; padding:8px; border:1px solid #e0e0e0; border-radius:4px;';
+    naamInput.addEventListener('input', function() { art.naam = this.value; });
+
+    const bedragInput = document.createElement('input');
+    bedragInput.type = 'text';
+    bedragInput.value = art.bedrag ? eur(art.bedrag) : '';
+    bedragInput.placeholder = '€ 0,00';
+    bedragInput.inputMode = 'decimal';
+    bedragInput.autocomplete = 'off';
+    bedragInput.style.cssText = 'width:100px; text-align:right; font-size:16px; padding:8px; border:1px solid #e0e0e0; border-radius:4px;';
+    bedragInput.addEventListener('input', function() { art.bedrag = parseEur(this.value); updateTotal(); });
+    bedragInput.addEventListener('focus', function() { this.select(); });
+
+    const starBtn = document.createElement('span');
+    starBtn.className = 'auto';
+    starBtn.textContent = '⭐';
+    starBtn.title = 'Bewaar in bibliotheek';
+    starBtn.style.cssText = 'color:#61a229; font-size:16px; padding:4px; cursor:pointer;';
+    starBtn.addEventListener('click', function() { saveToArtikelBib(art.naam, art.bedrag); });
+
+    const delBtn = document.createElement('span');
+    delBtn.className = 'auto';
+    delBtn.textContent = '✕';
+    delBtn.title = 'Verwijderen';
+    delBtn.style.cssText = 'color:#c62828; font-size:18px; padding:4px 8px; cursor:pointer;';
+    delBtn.addEventListener('click', function() { removeCustomArtikel(art.id); });
+
+    row.appendChild(naamInput);
+    row.appendChild(bedragInput);
+    row.appendChild(starBtn);
+    row.appendChild(delBtn);
     container.appendChild(row);
   });
 }
