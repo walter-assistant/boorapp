@@ -709,16 +709,7 @@ function downloadWKOPdf() {
   }
 }
 
-function updateLusOpties() {
-  const diameter = parseInt(document.getElementById('f-diameter').value);
-  const sel = document.getElementById('f-luslengte');
-  sel.innerHTML = '';
-  if (diameter === 32) {
-    sel.innerHTML = '<option value="110">110m — €460,00</option><option value="80">80m — €287,50</option><option value="50">50m — €172,50</option>';
-  } else {
-    sel.innerHTML = '<option value="225">225m — €1.100,00</option><option value="200">200m — €1.190,25</option><option value="185">185m — €977,50</option><option value="175">175m — €948,75</option><option value="165" selected>165m — €920,00</option><option value="152">152m — €862,50</option><option value="138">138m — €805,00</option><option value="127">127m — €632,50</option>';
-  }
-}
+function updateLusOpties() {}
 
 function eur(n) {
   if (isNaN(n) || n === null) n = 0;
@@ -774,34 +765,36 @@ function onKlantSelect() {
 }
 
 // ============================================================
-// COST DEFINITIONS
+// OFFERTE: CLUSTERS + VRIJE REGELS
 // ============================================================
 const COST_ITEMS = [
-  { key: 'boorkosten', label: 'Boorkosten', detail: '', expandable: true },
-  { key: 'lussen', label: 'Prijs Lussen', detail: '' },
-  { key: 'grout', label: 'Grout', detail: '', expandable: true },
-  { key: 'gewichten', label: 'Gewichten', detail: '' },
-  { key: 'verdelerput', label: 'Verdelerput', detail: '' },
-  { key: 'aansluiten', label: 'Aansluiten bronnen', detail: '' },
-  { key: 'glycol', label: 'Glycol', detail: '' },
-  { key: 'graafwerk', label: 'Graafwerk + kraan', detail: '' },
-  { key: 'transport', label: 'Transport', detail: '' },
-  { key: 'barogel', label: 'Barogel', detail: '', expandable: true },
-  { key: 'olo', label: 'OLO melding', detail: '' },
+  { key: 'boorkosten', label: 'Boorkosten' },
+  { key: 'lussen', label: 'Prijs Lussen' },
+  { key: 'grout', label: 'Grout' },
+  { key: 'gewichten', label: 'Gewichten' },
+  { key: 'verdelerput', label: 'Verdelerput' },
+  { key: 'aansluiten', label: 'Aansluiten bronnen' },
+  { key: 'glycol', label: 'Glycol' },
+  { key: 'barogel', label: 'Barogel' }
 ];
+const PROJECT_COST_KEYS = ['transport', 'graafwerk', 'olo'];
+const LUS_OPTIES = {
+  32: { 50: 172.50, 80: 287.50, 110: 460 },
+  40: { 127: 632.50, 138: 805, 152: 862.50, 165: 920, 175: 948.75, 185: 977.50, 200: 1190.25, 225: 1100 }
+};
+const GROUT_PER_LUS = { 50:1, 80:1, 110:2, 127:2, 138:2, 152:2, 165:3, 175:3, 185:3, 200:4, 225:4 };
+const BAROGEL_PER_LUS = { 50:2, 80:3, 110:4, 127:4, 138:4, 152:5, 165:7, 175:8, 185:8, 200:8, 225:10 };
+const BIB_KEY = 'gr_artikel_bib';
 
 let costValues = {};
-let costOverrides = {};
-
-// Editable unit parameters — all cost items
 let costParams = {
   boorkosten: { prijsPerMeter: 15 },
-  lussen: { prijsPerLus: null },  // null = auto from diameter/luslengte table
+  lussen: { prijsPerLus: null },
   grout: { aantalZakken: null, prijsPerZak: 425 },
   gewichten: { aantal: 3, prijsPerStuk: 80 },
   verdelerput: { prijs: 1250 },
   aansluiten: { prijs: 750 },
-  glycol: { liters: null, prijsPerLiter: 3.20 },  // null = auto from luslengte/diameter
+  glycol: { liters: null, prijsPerLiter: 3.20 },
   graafwerk: { prijs: 250 },
   transport: { prijs: 1000 },
   barogel: { aantalZakken: null, prijsPerZak: 17 },
@@ -809,383 +802,318 @@ let costParams = {
   olo: { prijs: 200 },
 };
 
-const PARAM_DEFAULTS = JSON.parse(JSON.stringify(costParams));
+let clusters = [];
+let clusterCounter = 0;
+let vrijeRegels = [];
+let vrijeRegelCounter = 0;
 
-// Custom articles
-let customArtikelen = [];
-let customArtikelCounter = 0;
-
-function addCustomArtikel(naam, bedrag) {
-  const id = ++customArtikelCounter;
-  customArtikelen.push({ id, naam: naam || '', bedrag: bedrag || 0 });
-  renderCustomArtikelen();
-  updateTotal();
+function esc(s) {
+  return String(s || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 }
 
-function removeCustomArtikel(id) {
-  customArtikelen = customArtikelen.filter(a => a.id !== id);
-  renderCustomArtikelen();
-  updateTotal();
+function lusOptieHtml(diameter, selected) {
+  const opties = diameter === 32
+    ? [[110, '110m - €460,00'], [80, '80m - €287,50'], [50, '50m - €172,50']]
+    : [[225, '225m - €1.100,00'], [200, '200m - €1.190,25'], [185, '185m - €977,50'], [175, '175m - €948,75'], [165, '165m - €920,00'], [152, '152m - €862,50'], [138, '138m - €805,00'], [127, '127m - €632,50']];
+  return opties.map(([v, label]) => `<option value="${v}" ${parseInt(selected, 10) === v ? 'selected' : ''}>${label}</option>`).join('');
 }
 
-function renderCustomArtikelen() {
-  const container = document.getElementById('custom-cost-rows');
-  container.innerHTML = '';
-  customArtikelen.forEach(art => {
-    const row = document.createElement('div');
-    row.className = 'cost-row';
-    row.style.cssText = 'border-left:3px solid #2e7d32;';
-    row.innerHTML = `
-      <input type="text" value="${art.naam}" placeholder="Omschrijving..." 
-             oninput="customArtikelen.find(a=>a.id===${art.id}).naam=this.value" 
-             style="flex:1; margin-right:8px; font-size:13px;">
-      <input type="text" value="${art.bedrag ? eur(art.bedrag) : ''}" placeholder="€ 0,00"
-             oninput="customArtikelen.find(a=>a.id===${art.id}).bedrag=parseEur(this.value); updateTotal();" 
-             onfocus="this.select()" style="width:100px; text-align:right;">
-      <span class="auto" onclick="removeCustomArtikel(${art.id})" title="Verwijderen" style="color:#c62828; font-size:14px;">✕</span>
-    `;
-    container.appendChild(row);
+function getBib() { try { return JSON.parse(localStorage.getItem(BIB_KEY) || '[]'); } catch(e) { return []; } }
+function saveBib(arr) { localStorage.setItem(BIB_KEY, JSON.stringify(arr)); }
+
+function populateBibSelect() {
+  const sel = document.getElementById('vrije-bib-select');
+  if (!sel) return;
+  const bib = getBib();
+  sel.innerHTML = '<option value="">Uit bibliotheek...</option>';
+  bib.forEach((item, i) => {
+    const o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = `${item.omschrijving} (${item.eenheid || 'Stuk'} - ${eur(item.prijs || 0)})`;
+    sel.appendChild(o);
   });
 }
 
-function paramRow(label, inputs) {
-  const row = document.createElement('div');
-  row.className = 'cost-row';
-  row.style.cssText = 'padding-left:20px; background:#f8f9fb; border-left:3px solid #4da6ff;';
-  row.innerHTML = `<span class="label" style="font-size:12px; color:#666;">${label}</span>${inputs}`;
-  return row;
-}
-
-function buildCostRows() {
-  const container = document.getElementById('cost-rows');
-  container.innerHTML = '';
-  COST_ITEMS.forEach(item => {
-    const row = document.createElement('div');
-    row.className = 'cost-row';
-    row.innerHTML = `
-      <span class="label">${item.label}<span class="detail" id="det-${item.key}"></span></span>
-      <input type="text" id="cost-${item.key}" oninput="onCostEdit('${item.key}')" onfocus="this.select()">
-      <span class="auto" id="reset-${item.key}" onclick="resetCost('${item.key}')" title="Herbereken">↻</span>
-    `;
-    container.appendChild(row);
-
-    // Parameter sub-rows per item
-    if (item.key === 'boorkosten') {
-      container.appendChild(paramRow('Prijs/meter', `
-        <input type="text" id="param-boor-ppm" value="${eur(costParams.boorkosten.prijsPerMeter)}" 
-               oninput="onParamEdit('boorkosten')" onfocus="this.select()" style="width:90px;">
-        <span class="auto" onclick="resetParam('boorkosten')" title="Reset">↻</span>`));
-    }
-    if (item.key === 'lussen') {
-      container.appendChild(paramRow('Prijs/lus', `
-        <input type="text" id="param-lussen-ppl" placeholder="auto" 
-               oninput="onParamEdit('lussen')" onfocus="this.select()" style="width:90px;">
-        <span class="auto" onclick="resetParam('lussen')" title="Reset">↻</span>`));
-    }
-    if (item.key === 'grout') {
-      container.appendChild(paramRow('Zakken × prijs', `
-        <input type="text" id="param-grout-zakken" placeholder="auto" 
-               oninput="onParamEdit('grout')" onfocus="this.select()" style="width:60px;">
-        <span style="font-size:12px; color:#666; margin:0 4px;">×</span>
-        <input type="text" id="param-grout-prijs" value="${eur(costParams.grout.prijsPerZak)}" 
-               oninput="onParamEdit('grout')" onfocus="this.select()" style="width:80px;">
-        <span style="font-size:11px; color:#999; margin-left:2px;">/zak</span>
-        <span class="auto" onclick="resetParam('grout')" title="Reset">↻</span>`));
-    }
-    if (item.key === 'gewichten') {
-      container.appendChild(paramRow('Aantal × prijs', `
-        <input type="text" id="param-gewichten-aantal" value="${costParams.gewichten.aantal}" 
-               oninput="onParamEdit('gewichten')" onfocus="this.select()" style="width:50px;">
-        <span style="font-size:12px; color:#666; margin:0 4px;">×</span>
-        <input type="text" id="param-gewichten-prijs" value="${eur(costParams.gewichten.prijsPerStuk)}" 
-               oninput="onParamEdit('gewichten')" onfocus="this.select()" style="width:80px;">
-        <span style="font-size:11px; color:#999; margin-left:2px;">/stuk</span>
-        <span class="auto" onclick="resetParam('gewichten')" title="Reset">↻</span>`));
-    }
-    if (item.key === 'verdelerput') {
-      container.appendChild(paramRow('Prijs', `
-        <input type="text" id="param-verdelerput-prijs" value="${eur(costParams.verdelerput.prijs)}" 
-               oninput="onParamEdit('verdelerput')" onfocus="this.select()" style="width:90px;">
-        <span class="auto" onclick="resetParam('verdelerput')" title="Reset">↻</span>`));
-    }
-    if (item.key === 'aansluiten') {
-      container.appendChild(paramRow('Prijs', `
-        <input type="text" id="param-aansluiten-prijs" value="${eur(costParams.aansluiten.prijs)}" 
-               oninput="onParamEdit('aansluiten')" onfocus="this.select()" style="width:90px;">
-        <span class="auto" onclick="resetParam('aansluiten')" title="Reset">↻</span>`));
-    }
-    if (item.key === 'glycol') {
-      container.appendChild(paramRow('Liters × prijs', `
-        <input type="text" id="param-glycol-liters" placeholder="auto" 
-               oninput="onParamEdit('glycol')" onfocus="this.select()" style="width:60px;">
-        <span style="font-size:11px; color:#999; margin-left:2px;">L</span>
-        <span style="font-size:12px; color:#666; margin:0 4px;">×</span>
-        <input type="text" id="param-glycol-prijs" value="${eur(costParams.glycol.prijsPerLiter)}" 
-               oninput="onParamEdit('glycol')" onfocus="this.select()" style="width:80px;">
-        <span style="font-size:11px; color:#999; margin-left:2px;">/L</span>
-        <span class="auto" onclick="resetParam('glycol')" title="Reset">↻</span>`));
-    }
-    if (item.key === 'graafwerk') {
-      container.appendChild(paramRow('Prijs', `
-        <input type="text" id="param-graafwerk-prijs" value="${eur(costParams.graafwerk.prijs)}" 
-               oninput="onParamEdit('graafwerk')" onfocus="this.select()" style="width:90px;">
-        <span class="auto" onclick="resetParam('graafwerk')" title="Reset">↻</span>`));
-    }
-    if (item.key === 'transport') {
-      container.appendChild(paramRow('Prijs', `
-        <input type="text" id="param-transport-prijs" value="${eur(costParams.transport.prijs)}" 
-               oninput="onParamEdit('transport')" onfocus="this.select()" style="width:90px;">
-        <span class="auto" onclick="resetParam('transport')" title="Reset">↻</span>`));
-    }
-    if (item.key === 'barogel') {
-      container.appendChild(paramRow('Zakken × prijs', `
-        <input type="text" id="param-barogel-zakken" placeholder="auto" 
-               oninput="onParamEdit('barogel')" onfocus="this.select()" style="width:60px;">
-        <span style="font-size:12px; color:#666; margin:0 4px;">×</span>
-        <input type="text" id="param-barogel-prijs" value="${eur(costParams.barogel.prijsPerZak)}" 
-               oninput="onParamEdit('barogel')" onfocus="this.select()" style="width:80px;">
-        <span style="font-size:11px; color:#999; margin-left:2px;">/zak</span>
-        <span class="auto" onclick="resetParam('barogel')" title="Reset">↻</span>`));
-    }
-    if (item.key === 'ezmud') {
-      container.appendChild(paramRow('Prijs', `
-        <input type="text" id="param-ezmud-prijs" value="${eur(costParams.ezmud.prijs)}" 
-               oninput="onParamEdit('ezmud')" onfocus="this.select()" style="width:90px;">
-        <span class="auto" onclick="resetParam('ezmud')" title="Reset">↻</span>`));
-    }
-    if (item.key === 'olo') {
-      container.appendChild(paramRow('Prijs', `
-        <input type="text" id="param-olo-prijs" value="${eur(costParams.olo.prijs)}" 
-               oninput="onParamEdit('olo')" onfocus="this.select()" style="width:90px;">
-        <span class="auto" onclick="resetParam('olo')" title="Reset">↻</span>`));
-    }
-  });
-}
-
-function onParamEdit(key) {
-  const p = costParams[key];
-  switch(key) {
-    case 'boorkosten': p.prijsPerMeter = parseEur(document.getElementById('param-boor-ppm').value); break;
-    case 'lussen': {
-      const v = document.getElementById('param-lussen-ppl').value.trim();
-      p.prijsPerLus = v ? parseEur(v) : null;
-      break;
-    }
-    case 'grout': {
-      const z = document.getElementById('param-grout-zakken').value.trim();
-      p.aantalZakken = z ? parseInt(z) : null;
-      p.prijsPerZak = parseEur(document.getElementById('param-grout-prijs').value);
-      break;
-    }
-    case 'gewichten':
-      p.aantal = parseInt(document.getElementById('param-gewichten-aantal').value) || 0;
-      p.prijsPerStuk = parseEur(document.getElementById('param-gewichten-prijs').value);
-      break;
-    case 'verdelerput': p.prijs = parseEur(document.getElementById('param-verdelerput-prijs').value); break;
-    case 'aansluiten': p.prijs = parseEur(document.getElementById('param-aansluiten-prijs').value); break;
-    case 'glycol': {
-      const l = document.getElementById('param-glycol-liters').value.trim();
-      p.liters = l ? parseFloat(l.replace(',', '.')) : null;
-      p.prijsPerLiter = parseEur(document.getElementById('param-glycol-prijs').value);
-      break;
-    }
-    case 'graafwerk': p.prijs = parseEur(document.getElementById('param-graafwerk-prijs').value); break;
-    case 'transport': p.prijs = parseEur(document.getElementById('param-transport-prijs').value); break;
-    case 'barogel': {
-      const z = document.getElementById('param-barogel-zakken').value.trim();
-      p.aantalZakken = z ? parseInt(z) : null;
-      p.prijsPerZak = parseEur(document.getElementById('param-barogel-prijs').value);
-      break;
-    }
-    case 'ezmud': p.prijs = parseEur(document.getElementById('param-ezmud-prijs').value); break;
-    case 'olo': p.prijs = parseEur(document.getElementById('param-olo-prijs').value); break;
+function renderBibList() {
+  const list = document.getElementById('bibList');
+  if (!list) return;
+  const bib = getBib();
+  if (!bib.length) {
+    list.innerHTML = '<p style="color:#98a2b3; text-align:center; padding:12px 0;">Nog geen artikelen bewaard</p>';
+    return;
   }
-  delete costOverrides[key];
-  calc();
+  list.innerHTML = '';
+  bib.forEach((item, i) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid #eef2f6;';
+    row.innerHTML = `<span style="flex:1; font-size:13px;">${esc(item.omschrijving)}</span>
+      <span style="font-size:12px; color:#667085; margin:0 8px;">${esc(item.eenheid || 'Stuk')}</span>
+      <span style="font-size:13px; font-weight:600; margin-right:12px;">${eur(item.prijs || 0)}</span>
+      <span onclick="removeFromBib(${i})" style="color:#c62828; cursor:pointer; font-size:14px;" title="Verwijderen">✕</span>`;
+    list.appendChild(row);
+  });
 }
 
-function resetParam(key) {
-  costParams[key] = JSON.parse(JSON.stringify(PARAM_DEFAULTS[key]));
-  // Reset the UI fields
-  const fieldMap = {
-    boorkosten: () => { document.getElementById('param-boor-ppm').value = eur(PARAM_DEFAULTS.boorkosten.prijsPerMeter); },
-    lussen: () => { document.getElementById('param-lussen-ppl').value = ''; document.getElementById('param-lussen-ppl').placeholder = 'auto'; },
-    grout: () => { document.getElementById('param-grout-zakken').value = ''; document.getElementById('param-grout-zakken').placeholder = 'auto'; document.getElementById('param-grout-prijs').value = eur(PARAM_DEFAULTS.grout.prijsPerZak); },
-    gewichten: () => { document.getElementById('param-gewichten-aantal').value = PARAM_DEFAULTS.gewichten.aantal; document.getElementById('param-gewichten-prijs').value = eur(PARAM_DEFAULTS.gewichten.prijsPerStuk); },
-    verdelerput: () => { document.getElementById('param-verdelerput-prijs').value = eur(PARAM_DEFAULTS.verdelerput.prijs); },
-    aansluiten: () => { document.getElementById('param-aansluiten-prijs').value = eur(PARAM_DEFAULTS.aansluiten.prijs); },
-    glycol: () => { document.getElementById('param-glycol-liters').value = ''; document.getElementById('param-glycol-liters').placeholder = 'auto'; document.getElementById('param-glycol-prijs').value = eur(PARAM_DEFAULTS.glycol.prijsPerLiter); },
-    graafwerk: () => { document.getElementById('param-graafwerk-prijs').value = eur(PARAM_DEFAULTS.graafwerk.prijs); },
-    transport: () => { document.getElementById('param-transport-prijs').value = eur(PARAM_DEFAULTS.transport.prijs); },
-    barogel: () => { document.getElementById('param-barogel-zakken').value = ''; document.getElementById('param-barogel-zakken').placeholder = 'auto'; document.getElementById('param-barogel-prijs').value = eur(PARAM_DEFAULTS.barogel.prijsPerZak); },
-    ezmud: () => { document.getElementById('param-ezmud-prijs').value = eur(PARAM_DEFAULTS.ezmud.prijs); },
-    olo: () => { document.getElementById('param-olo-prijs').value = eur(PARAM_DEFAULTS.olo.prijs); },
+function addToBib() {
+  const naam = (document.getElementById('bibNaam').value || '').trim();
+  const eenheid = (document.getElementById('bibEenheid').value || '').trim() || 'Stuk';
+  const prijs = parseFloat(document.getElementById('bibPrijs').value) || 0;
+  if (!naam) return alert('Vul een omschrijving in');
+  const bib = getBib();
+  bib.push({ omschrijving: naam, eenheid, prijs });
+  saveBib(bib);
+  document.getElementById('bibNaam').value = '';
+  document.getElementById('bibPrijs').value = '';
+  renderBibList();
+  populateBibSelect();
+}
+
+function removeFromBib(idx) {
+  const bib = getBib();
+  bib.splice(idx, 1);
+  saveBib(bib);
+  renderBibList();
+  populateBibSelect();
+}
+
+function openVrijeBibModal() {
+  const modal = document.getElementById('vrije-bib-modal');
+  if (!modal) return;
+  modal.classList.add('active');
+  renderBibList();
+}
+
+function closeVrijeBibModal() {
+  const modal = document.getElementById('vrije-bib-modal');
+  if (!modal) return;
+  modal.classList.remove('active');
+}
+
+function addVrijeRegelFromBib(sel) {
+  const idx = parseInt(sel.value, 10);
+  if (isNaN(idx)) return;
+  const item = getBib()[idx];
+  if (item) addVrijeRegel(item.omschrijving, item.prijs || 0);
+  sel.value = '';
+}
+
+function getDefaultCluster() {
+  return {
+    id: ++clusterCounter,
+    label: `Cluster ${clusterCounter}`,
+    vermogen: 8,
+    boringen: 1,
+    diepte: 225,
+    diameter: 40,
+    luslengte: 165,
+    verdelerput: false
   };
-  if (fieldMap[key]) fieldMap[key]();
-  delete costOverrides[key];
+}
+
+function addCluster(data) {
+  const base = getDefaultCluster();
+  const cluster = Object.assign(base, data || {});
+  if (cluster.id > clusterCounter) clusterCounter = cluster.id;
+  clusters.push(cluster);
+  renderClusters();
   calc();
 }
 
-function onCostEdit(key) {
-  costOverrides[key] = true;
-  updateTotal();
-}
-
-function resetCost(key) {
-  delete costOverrides[key];
+function removeCluster(id) {
+  if (clusters.length <= 1) return alert('Minimaal 1 cluster vereist');
+  clusters = clusters.filter(c => c.id !== id);
+  renderClusters();
   calc();
 }
 
-// ============================================================
-// CALCULATIONS
-// ============================================================
-function calc() {
-  const vermogen = parseFloat(document.getElementById('f-vermogen').value) || 0;
-  const factor = parseFloat(document.getElementById('f-factor').value) || 0;
-  const bodemvermogen = vermogen * factor;
-  document.getElementById('f-bodemvermogen').value = bodemvermogen.toFixed(2);
-
-  const boringen = parseInt(document.getElementById('f-boringen').value) || 1;
-  const meters = parseFloat(document.getElementById('f-meters').value) || 0;
-  const mpb = boringen > 0 ? meters / boringen : 0;
-  document.getElementById('f-mpb').value = mpb.toFixed(1);
-
-  const diameter = parseInt(document.getElementById('f-diameter').value);
-  const verdelerput = document.getElementById('f-verdelerput').checked;
-
-  // --- Boorkosten ---
-  const boorPPM = costParams.boorkosten.prijsPerMeter;
-  if (!costOverrides['boorkosten']) setCost('boorkosten', meters * boorPPM);
-  setDetail('boorkosten', `${meters}m × ${eur(boorPPM)}/m`);
-
-  // --- Lussen ---
-  if (!costOverrides['lussen']) {
-    const lusLengte = parseInt(document.getElementById('f-luslengte').value);
-    const lusOpties = {
-      32: { 50: 172.50, 80: 287.50, 110: 460 },
-      40: { 127: 632.50, 138: 805, 152: 862.50, 165: 920, 175: 948.75, 185: 977.50, 200: 1190.25, 225: 1100 }
-    };
-    const autoPrijs = lusOpties[diameter]?.[lusLengte] || 920;
-    const prijsPerLus = costParams.lussen.prijsPerLus !== null ? costParams.lussen.prijsPerLus : autoPrijs;
-    const lussenPrijs = prijsPerLus * boringen;
-    setCost('lussen', lussenPrijs);
-    setDetail('lussen', `${boringen} lus${boringen > 1 ? 'sen' : ''} × ${eur(prijsPerLus)}`);
-    if (costParams.lussen.prijsPerLus === null) {
-      const el = document.getElementById('param-lussen-ppl');
-      if (el && el !== document.activeElement) el.placeholder = eur(autoPrijs);
-    }
+function syncClusterField(id, key, value) {
+  const c = clusters.find(x => x.id === id);
+  if (!c) return;
+  if (key === 'label') c[key] = value;
+  else if (key === 'verdelerput') c[key] = !!value;
+  else c[key] = Number(value) || 0;
+  if (key === 'diameter') {
+    if (c.diameter === 32 && ![50, 80, 110].includes(parseInt(c.luslengte, 10))) c.luslengte = 110;
+    if (c.diameter === 40 && ![127, 138, 152, 165, 175, 185, 200, 225].includes(parseInt(c.luslengte, 10))) c.luslengte = 165;
+    renderClusters();
   }
-
-  // --- Grout ---
-  if (!costOverrides['grout']) {
-    // Lookup table: luslengte → grout zakken per boring
-    const groutPerLus = { 50:1, 80:1, 110:2, 127:2, 138:2, 152:2, 165:3, 175:3, 185:3, 200:4, 225:4 };
-    const lusLengteGrout = parseInt(document.getElementById('f-luslengte').value);
-    const autoZakken = (groutPerLus[lusLengteGrout] || Math.ceil(mpb / 28)) * boringen;
-    const groutZakken = costParams.grout.aantalZakken !== null ? costParams.grout.aantalZakken : autoZakken;
-    const groutPrijs = costParams.grout.prijsPerZak;
-    const groutTotaal = groutZakken * groutPrijs;
-    setCost('grout', groutTotaal);
-    const autoLabel = costParams.grout.aantalZakken !== null ? '' : ' (auto)';
-    setDetail('grout', `${groutZakken} zakken${autoLabel} × ${eur(groutPrijs)}`);
-    // Update param fields to show calculated values
-    if (costParams.grout.aantalZakken === null) {
-      const el = document.getElementById('param-grout-zakken');
-      if (el && el !== document.activeElement) el.placeholder = autoZakken;
-    }
-  }
-
-  // --- Gewichten ---
-  if (!costOverrides['gewichten']) {
-    const gw = costParams.gewichten;
-    setCost('gewichten', gw.aantal * gw.prijsPerStuk);
-    setDetail('gewichten', `${gw.aantal} × ${eur(gw.prijsPerStuk)}`);
-  }
-
-  // --- Verdelerput ---
-  if (!costOverrides['verdelerput']) {
-    setCost('verdelerput', verdelerput ? costParams.verdelerput.prijs : 0);
-    setDetail('verdelerput', verdelerput ? eur(costParams.verdelerput.prijs) : 'Nee');
-  }
-
-  // --- Aansluiten ---
-  if (!costOverrides['aansluiten']) setCost('aansluiten', costParams.aansluiten.prijs);
-
-  // --- Glycol ---
-  if (!costOverrides['glycol']) {
-    // Binnendiameter lus in meters (32mm buis → 26mm binnen, 40mm buis → 32.6mm binnen)
-    const diam_m = diameter === 32 ? 0.026 : 0.0326;
-    const lusLengteM = parseInt(document.getElementById('f-luslengte').value) || (mpb * 2);
-    const totaleLusLengte = lusLengteM * 2 * boringen;  // ×2: lus gaat naar beneden én weer omhoog
-    const inhoudL = Math.PI * Math.pow(diam_m / 2, 2) * totaleLusLengte * 1000;
-    const autoGlycolL = Math.ceil(inhoudL * 0.30);
-    const glycolL = costParams.glycol.liters !== null ? costParams.glycol.liters : autoGlycolL;
-    const glycolPrijs = glycolL * costParams.glycol.prijsPerLiter;
-    setCost('glycol', glycolPrijs);
-    const autoLabel = costParams.glycol.liters !== null ? '' : ' (auto)';
-    setDetail('glycol', `${inhoudL.toFixed(0)}L inhoud → ${glycolL}L glycol${autoLabel} × ${eur(costParams.glycol.prijsPerLiter)}/L`);
-    if (costParams.glycol.liters === null) {
-      const el = document.getElementById('param-glycol-liters');
-      if (el && el !== document.activeElement) el.placeholder = autoGlycolL;
-    }
-  }
-
-  // --- Graafwerk ---
-  if (!costOverrides['graafwerk']) setCost('graafwerk', costParams.graafwerk.prijs);
-
-  // --- Transport ---
-  if (!costOverrides['transport']) setCost('transport', costParams.transport.prijs);
-
-  // --- Barogel ---
-  if (!costOverrides['barogel']) {
-    // Lookup table: luslengte → barogel zakken per boring
-    const barogelPerLus = { 50:2, 80:3, 110:4, 127:4, 138:4, 152:5, 165:7, 175:8, 185:8, 200:8, 225:10 };
-    const lusLengteBarogel = parseInt(document.getElementById('f-luslengte').value);
-    const autoZakken = (barogelPerLus[lusLengteBarogel] || Math.ceil(mpb / 8.65)) * boringen;
-    const barogelZakken = costParams.barogel.aantalZakken !== null ? costParams.barogel.aantalZakken : autoZakken;
-    const barogelPrijs = costParams.barogel.prijsPerZak;
-    setCost('barogel', barogelZakken * barogelPrijs);
-    const autoLabel = costParams.barogel.aantalZakken !== null ? '' : ' (auto)';
-    setDetail('barogel', `${barogelZakken} zakken${autoLabel} × ${eur(barogelPrijs)}`);
-    if (costParams.barogel.aantalZakken === null) {
-      const el = document.getElementById('param-barogel-zakken');
-      if (el && el !== document.activeElement) el.placeholder = autoZakken;
-    }
-  }
-
-  // --- EZ Mud ---
-  if (!costOverrides['ezmud']) setCost('ezmud', costParams.ezmud.prijs);
-
-  // --- OLO ---
-  if (!costOverrides['olo']) setCost('olo', costParams.olo.prijs);
-
-  updateTotal();
+  calc();
 }
 
-function setCost(key, val) {
-  const el = document.getElementById('cost-' + key);
-  if (el) el.value = eur(val);
-  costValues[key] = val;
+function renderClusters() {
+  const container = document.getElementById('clusters-list');
+  if (!container) return;
+  container.innerHTML = '';
+  clusters.forEach((c, idx) => {
+    const meta = calculateCluster(c);
+    const div = document.createElement('div');
+    div.className = 'cluster-card';
+    div.innerHTML = `
+      <div class="cluster-title">
+        <strong>${esc(c.label || `Cluster ${idx + 1}`)}</strong>
+        <button class="btn btn-danger btn-sm" onclick="removeCluster(${c.id})">Verwijderen</button>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Naam / Label</label><input type="text" value="${esc(c.label || '')}" oninput="syncClusterField(${c.id}, 'label', this.value)"></div>
+        <div class="form-group"><label>Warmtepomp vermogen (kW)</label><input type="number" step="0.1" min="0" value="${Number(c.vermogen) || 0}" oninput="syncClusterField(${c.id}, 'vermogen', this.value)"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Aantal bronnen</label><input type="number" min="1" value="${Number(c.boringen) || 1}" oninput="syncClusterField(${c.id}, 'boringen', this.value)"></div>
+        <div class="form-group"><label>Diepte per bron (m)</label><input type="number" min="1" value="${Number(c.diepte) || 0}" oninput="syncClusterField(${c.id}, 'diepte', this.value)"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Diameter buis (mm)</label>
+          <select onchange="syncClusterField(${c.id}, 'diameter', this.value)">
+            <option value="32" ${parseInt(c.diameter, 10) === 32 ? 'selected' : ''}>32mm</option>
+            <option value="40" ${parseInt(c.diameter, 10) === 40 ? 'selected' : ''}>40mm</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Luslengte</label>
+          <select onchange="syncClusterField(${c.id}, 'luslengte', this.value)">
+            ${lusOptieHtml(parseInt(c.diameter, 10) || 40, parseInt(c.luslengte, 10) || 165)}
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Verdelerput</label>
+          <select onchange="syncClusterField(${c.id}, 'verdelerput', this.value === '1')">
+            <option value="0" ${c.verdelerput ? '' : 'selected'}>Nee</option>
+            <option value="1" ${c.verdelerput ? 'selected' : ''}>Ja</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Cluster totaal</label>
+          <input type="text" readonly value="${eur(meta.total)}">
+        </div>
+      </div>
+      <div class="cluster-meta">${meta.boringen} bron(nen) × ${meta.diepte}m = ${meta.meters}m totaal • ${meta.diameter}mm • lus ${meta.luslengte}m</div>
+    `;
+    container.appendChild(div);
+  });
 }
 
-function setDetail(key, text) {
-  const el = document.getElementById('det-' + key);
-  if (el) el.textContent = ' (' + text + ')';
+function addVrijeRegel(naam, bedrag) {
+  const id = ++vrijeRegelCounter;
+  vrijeRegels.push({ id, naam: naam || '', bedrag: Number(bedrag) || 0 });
+  renderVrijeRegels();
+  calc();
 }
 
-function getCostVal(key) {
-  if (costOverrides[key]) {
-    return parseEur(document.getElementById('cost-' + key).value);
-  }
-  return costValues[key] || 0;
+function removeVrijeRegel(id) {
+  vrijeRegels = vrijeRegels.filter(r => r.id !== id);
+  renderVrijeRegels();
+  calc();
 }
 
-function updateTotal() {
+function updateVrijeRegel(id, key, value) {
+  const regel = vrijeRegels.find(r => r.id === id);
+  if (!regel) return;
+  regel[key] = key === 'bedrag' ? parseEur(value) : value;
+  calc();
+}
+
+function renderVrijeRegels() {
+  const container = document.getElementById('vrije-regels-list');
+  if (!container) return;
+  container.innerHTML = '';
+  vrijeRegels.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'vrije-row';
+    row.innerHTML = `
+      <input type="text" value="${esc(r.naam || '')}" placeholder="Omschrijving" oninput="updateVrijeRegel(${r.id}, 'naam', this.value)">
+      <input type="text" value="${r.bedrag ? eur(r.bedrag) : ''}" placeholder="€ 0,00" oninput="updateVrijeRegel(${r.id}, 'bedrag', this.value)">
+      <button class="btn btn-danger btn-sm" onclick="removeVrijeRegel(${r.id})">✕</button>`;
+    container.appendChild(row);
+  });
+}
+
+function calculateCluster(cluster) {
+  const boringen = Math.max(1, parseInt(cluster.boringen, 10) || 1);
+  const diepte = Math.max(0, parseFloat(cluster.diepte) || 0);
+  const meters = diepte * boringen;
+  const diameter = parseInt(cluster.diameter, 10) || 40;
+  const luslengte = parseInt(cluster.luslengte, 10) || 165;
+  const verdelerput = !!cluster.verdelerput;
+  const boorPPM = parseFloat(costParams.boorkosten.prijsPerMeter) || 0;
+  const autoLusPrijs = LUS_OPTIES[diameter]?.[luslengte] || 920;
+  const prijsPerLus = costParams.lussen.prijsPerLus !== null ? costParams.lussen.prijsPerLus : autoLusPrijs;
+  const groutAuto = (GROUT_PER_LUS[luslengte] || Math.ceil(diepte / 28)) * boringen;
+  const groutZakken = costParams.grout.aantalZakken !== null ? costParams.grout.aantalZakken : groutAuto;
+  const barogelAuto = (BAROGEL_PER_LUS[luslengte] || Math.ceil(diepte / 8.65)) * boringen;
+  const barogelZakken = costParams.barogel.aantalZakken !== null ? costParams.barogel.aantalZakken : barogelAuto;
+  const diamM = diameter === 32 ? 0.026 : 0.0326;
+  const totaleLusLengte = luslengte * 2 * boringen;
+  const inhoudL = Math.PI * Math.pow(diamM / 2, 2) * totaleLusLengte * 1000;
+  const glycolL = costParams.glycol.liters !== null ? costParams.glycol.liters : Math.ceil(inhoudL * 0.30);
+  const values = {
+    boorkosten: meters * boorPPM,
+    lussen: prijsPerLus * boringen,
+    grout: groutZakken * (parseFloat(costParams.grout.prijsPerZak) || 0),
+    gewichten: (parseFloat(costParams.gewichten.aantal) || 0) * (parseFloat(costParams.gewichten.prijsPerStuk) || 0),
+    verdelerput: verdelerput ? (parseFloat(costParams.verdelerput.prijs) || 0) : 0,
+    aansluiten: parseFloat(costParams.aansluiten.prijs) || 0,
+    glycol: glycolL * (parseFloat(costParams.glycol.prijsPerLiter) || 0),
+    barogel: barogelZakken * (parseFloat(costParams.barogel.prijsPerZak) || 0)
+  };
   let total = 0;
-  COST_ITEMS.forEach(item => { total += getCostVal(item.key); });
-  customArtikelen.forEach(a => { total += (a.bedrag || 0); });
-  document.getElementById('cost-total').textContent = eur(total);
+  Object.values(values).forEach(v => { total += v; });
+  return { boringen, diepte, meters, diameter, luslengte, values, total };
 }
+
+function buildCostRows() { renderCostRows(); }
+function onParamEdit() {}
+function resetParam() {}
+function onCostEdit() {}
+function resetCost() {}
+
+function renderCostRows() {
+  const container = document.getElementById('cost-rows');
+  if (!container) return;
+  container.innerHTML = '';
+  clusters.forEach((c, idx) => {
+    const meta = calculateCluster(c);
+    const row = document.createElement('div');
+    row.className = 'cost-row';
+    row.innerHTML = `<span class="label">${esc(c.label || `Cluster ${idx + 1}`)} (${Number(c.vermogen || 0).toFixed(1)} kW)</span><span style="font-weight:600;">${eur(meta.total)}</span>`;
+    container.appendChild(row);
+  });
+  PROJECT_COST_KEYS.forEach(key => {
+    const labels = { transport: 'Transport', graafwerk: 'Graafwerk + kraan', olo: 'OLO melding' };
+    const row = document.createElement('div');
+    row.className = 'cost-row';
+    row.innerHTML = `<span class="label">${labels[key]}</span><span style="font-weight:600;">${eur(costValues[key] || 0)}</span>`;
+    container.appendChild(row);
+  });
+  vrijeRegels.filter(r => (r.naam || '').trim()).forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'cost-row';
+    row.innerHTML = `<span class="label">${esc(r.naam)}</span><span style="font-weight:600;">${eur(r.bedrag || 0)}</span>`;
+    container.appendChild(row);
+  });
+}
+
+function calc() {
+  const projectCosts = {
+    transport: parseEur(document.getElementById('f-transport')?.value || costParams.transport.prijs),
+    graafwerk: parseEur(document.getElementById('f-graafwerk')?.value || costParams.graafwerk.prijs),
+    olo: parseEur(document.getElementById('f-olo')?.value || costParams.olo.prijs)
+  };
+  costValues = Object.assign({}, projectCosts);
+  let clusterTotal = 0;
+  clusters.forEach(c => {
+    const meta = calculateCluster(c);
+    clusterTotal += meta.total;
+  });
+  let vrijeTotal = 0;
+  vrijeRegels.forEach(r => { vrijeTotal += parseFloat(r.bedrag) || 0; });
+  const total = clusterTotal + projectCosts.transport + projectCosts.graafwerk + projectCosts.olo + vrijeTotal;
+  document.getElementById('cost-total').textContent = eur(total);
+  renderCostRows();
+  return total;
+}
+
+function updateTotal() { calc(); }
 
 // ============================================================
 // KLANTEN CRUD
@@ -1266,11 +1194,27 @@ function deleteKlant(id) {
 function gatherOfferteData() {
   const klantId = document.getElementById('f-klant').value;
   const klant = klantId && klantId !== '__new__' ? getKlanten().find(k => k.id == klantId) : null;
-  const costs = {};
-  COST_ITEMS.forEach(item => { costs[item.key] = getCostVal(item.key); });
+  const clusterCalc = clusters.map(c => ({ cluster: c, calc: calculateCluster(c) }));
+  const clusterCosts = {};
+  COST_ITEMS.forEach(item => {
+    clusterCosts[item.key] = 0;
+    clusterCalc.forEach(cc => { clusterCosts[item.key] += cc.calc.values[item.key] || 0; });
+  });
+  const projectCosts = {
+    transport: parseEur(document.getElementById('f-transport')?.value || 0),
+    graafwerk: parseEur(document.getElementById('f-graafwerk')?.value || 0),
+    olo: parseEur(document.getElementById('f-olo')?.value || 0)
+  };
+  const costs = Object.assign({}, clusterCosts, projectCosts);
+  const vrijeRegelsData = vrijeRegels
+    .filter(r => (r.naam || '').trim())
+    .map(r => ({ naam: r.naam, bedrag: parseFloat(r.bedrag) || 0 }));
   let total = 0;
   Object.values(costs).forEach(v => total += v);
-  customArtikelen.forEach(a => { total += (a.bedrag || 0); });
+  vrijeRegelsData.forEach(r => { total += r.bedrag; });
+
+  const firstCluster = clusters[0] || getDefaultCluster();
+  const firstCalc = calculateCluster(firstCluster);
 
   return {
     klantId,
@@ -1280,21 +1224,33 @@ function gatherOfferteData() {
     kenmerk: document.getElementById('f-kenmerk').value,
     datum: document.getElementById('f-datum').value,
     betreft: document.getElementById('f-betreft').value,
-    vermogen: parseFloat(document.getElementById('f-vermogen').value) || 0,
-    factor: parseFloat(document.getElementById('f-factor').value) || 0,
-    bodemvermogen: parseFloat(document.getElementById('f-bodemvermogen').value) || 0,
-    pompen: parseInt(document.getElementById('f-pompen').value) || 1,
-    boringen: parseInt(document.getElementById('f-boringen').value) || 1,
-    meters: parseFloat(document.getElementById('f-meters').value) || 0,
-    mpb: parseFloat(document.getElementById('f-mpb').value) || 0,
-    verdelerput: document.getElementById('f-verdelerput').checked,
     locatie: document.getElementById('f-locatie').value,
-    diameter: document.getElementById('f-diameter').value,
-    luslengte: document.getElementById('f-luslengte').value,
     telefoon: document.getElementById('f-telefoon').value,
     bevoegd: document.getElementById('f-bevoegd').value,
+    clusters: clusters.map(c => ({
+      id: c.id,
+      label: c.label || '',
+      vermogen: parseFloat(c.vermogen) || 0,
+      boringen: parseInt(c.boringen, 10) || 1,
+      diepte: parseFloat(c.diepte) || 0,
+      diameter: String(c.diameter || '40'),
+      luslengte: String(c.luslengte || '165'),
+      verdelerput: !!c.verdelerput
+    })),
+    vrijeRegels: vrijeRegelsData,
+    projectKosten: projectCosts,
     costs,
-    customArtikelen: customArtikelen.filter(a => a.naam).map(a => ({ naam: a.naam, bedrag: a.bedrag || 0 })),
+    customArtikelen: vrijeRegelsData,
+    vermogen: parseFloat(firstCluster.vermogen) || 0,
+    factor: 1,
+    bodemvermogen: parseFloat(firstCluster.vermogen) || 0,
+    pompen: 1,
+    boringen: firstCalc.boringen,
+    meters: firstCalc.meters,
+    mpb: firstCalc.diepte,
+    verdelerput: !!firstCluster.verdelerput,
+    diameter: String(firstCluster.diameter || '40'),
+    luslengte: String(firstCluster.luslengte || '165'),
     total
   };
 }
@@ -1319,13 +1275,15 @@ function renderOffertes() {
   }
   list.innerHTML = '';
   offertes.forEach((o, idx) => {
+    const norm = normalizeOfferteData(o);
+    const meters = (norm.clusters || []).reduce((sum, c) => sum + ((parseFloat(c.diepte) || 0) * (parseInt(c.boringen, 10) || 0)), 0);
     const card = document.createElement('div');
     card.className = 'offerte-card';
     const d = o.datum || o.savedAt?.substring(0, 10) || '';
     card.innerHTML = `
       <div class="offerte-info">
         <h3>${o.kenmerk || 'Geen kenmerk'} — ${o.klantNaam || 'Onbekend'}</h3>
-        <p>${d} · ${o.betreft || ''} · ${o.meters || 0}m</p>
+        <p>${d} · ${o.betreft || ''} · ${meters || 0}m · ${norm.clusters.length} cluster(s)</p>
       </div>
       <div style="display:flex;align-items:center;gap:12px;">
         <span class="offerte-amount">${eur(o.total)}</span>
@@ -1339,44 +1297,63 @@ function renderOffertes() {
   });
 }
 
+function normalizeOfferteData(o) {
+  const data = Object.assign({}, o || {});
+  if (!Array.isArray(data.clusters) || !data.clusters.length) {
+    data.clusters = [{
+      id: 1,
+      label: 'Cluster 1',
+      vermogen: parseFloat(data.vermogen) || 0,
+      boringen: parseInt(data.boringen, 10) || 1,
+      diepte: parseFloat(data.mpb) || ((parseFloat(data.meters) || 0) / Math.max(parseInt(data.boringen, 10) || 1, 1)),
+      diameter: String(data.diameter || '40'),
+      luslengte: String(data.luslengte || '165'),
+      verdelerput: !!data.verdelerput
+    }];
+  }
+  if (!Array.isArray(data.vrijeRegels)) {
+    data.vrijeRegels = Array.isArray(data.customArtikelen) ? data.customArtikelen : [];
+  }
+  if (!data.projectKosten) {
+    data.projectKosten = {
+      transport: parseFloat(data.costs?.transport) || 0,
+      graafwerk: parseFloat(data.costs?.graafwerk) || 0,
+      olo: parseFloat(data.costs?.olo) || 0
+    };
+  }
+  return data;
+}
+
 function loadOfferte(idx) {
-  const o = getOffertes()[idx];
+  const o = normalizeOfferteData(getOffertes()[idx]);
   if (!o) return;
   document.getElementById('f-klant').value = o.klantId || '';
   document.getElementById('f-tav').value = o.tav || '';
   document.getElementById('f-kenmerk').value = o.kenmerk || '';
   document.getElementById('f-datum').value = o.datum || '';
   document.getElementById('f-betreft').value = o.betreft || '';
-  document.getElementById('f-vermogen').value = o.vermogen || '';
-  document.getElementById('f-factor').value = o.factor || '';
-  document.getElementById('f-pompen').value = o.pompen || 1;
-  document.getElementById('f-boringen').value = o.boringen || 1;
-  document.getElementById('f-meters').value = o.meters || '';
-  document.getElementById('f-diameter').value = o.diameter || '40';
-  updateLusOpties();
-  document.getElementById('f-luslengte').value = o.luslengte || '165';
-  document.getElementById('f-verdelerput').checked = !!o.verdelerput;
   document.getElementById('f-locatie').value = o.locatie || '';
   document.getElementById('f-telefoon').value = o.telefoon || '';
   document.getElementById('f-bevoegd').value = o.bevoegd || '';
-
-  // Set cost overrides
-  costOverrides = {};
-  if (o.costs) {
-    COST_ITEMS.forEach(item => {
-      costOverrides[item.key] = true;
-    });
-    calc(); // calc first to set details
-    COST_ITEMS.forEach(item => {
-      if (o.costs[item.key] !== undefined) {
-        costOverrides[item.key] = true;
-        document.getElementById('cost-' + item.key).value = eur(o.costs[item.key]);
-      }
-    });
-    updateTotal();
-  } else {
-    calc();
-  }
+  document.getElementById('f-transport').value = eur(o.projectKosten?.transport ?? o.costs?.transport ?? 0);
+  document.getElementById('f-graafwerk').value = eur(o.projectKosten?.graafwerk ?? o.costs?.graafwerk ?? 0);
+  document.getElementById('f-olo').value = eur(o.projectKosten?.olo ?? o.costs?.olo ?? 0);
+  clusters = (o.clusters || []).map((c, i) => ({
+    id: c.id || (i + 1),
+    label: c.label || `Cluster ${i + 1}`,
+    vermogen: parseFloat(c.vermogen) || 0,
+    boringen: parseInt(c.boringen, 10) || 1,
+    diepte: parseFloat(c.diepte) || 0,
+    diameter: parseInt(c.diameter, 10) || 40,
+    luslengte: parseInt(c.luslengte, 10) || 165,
+    verdelerput: !!c.verdelerput
+  }));
+  clusterCounter = clusters.reduce((m, c) => Math.max(m, c.id || 0), 0);
+  vrijeRegels = (o.vrijeRegels || []).map((r, i) => ({ id: i + 1, naam: r.naam || '', bedrag: parseFloat(r.bedrag) || 0 }));
+  vrijeRegelCounter = vrijeRegels.length;
+  renderClusters();
+  renderVrijeRegels();
+  calc();
   switchTab('offerte');
 }
 
@@ -1405,483 +1382,225 @@ function generatePDF() {
   const d = gatherOfferteData();
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF('p', 'mm', 'a4');
-  const W = 210, M = 20;
-  const pw = W - 2 * M;
-  
-  // Kleuren
+  const W = 210, H = 297, M = 20, PW = W - (M * 2);
   const DARK_BLUE = [26, 35, 50];
   const MEDIUM_BLUE = [30, 58, 95];
   const ORANGE = [232, 115, 12];
   const LIGHT_GRAY = [245, 247, 250];
 
-  function addFooter(pageNum) {
+  function addFooter() {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
-    const footerText = '123Bodemenergie is onderdeel van Ground Research. Vrijheidweg 45. 1521 RP Wormerveer 088-1262910. KvK 37089931. NL48RABO0346687667';
-    doc.text(footerText, W/2, 290, { align: 'center' });
+    doc.text('123Bodemenergie is onderdeel van Ground Research. Vrijheidweg 45. 1521 RP Wormerveer 088-1262910.', W / 2, 290, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
   }
 
-  function addHeader(title, withLogo = false) {
-    var bannerH = 50;
-    // Photo banner background
+  function addHeader(title, withLogo) {
+    const bannerH = 50;
     try {
-      var headerImg = withLogo ? HEADER_DRILLING : HEADER_CLOSEUP;
+      const headerImg = withLogo ? HEADER_DRILLING : HEADER_CLOSEUP;
       doc.addImage(headerImg, 'JPEG', 0, 0, W, bannerH);
-      // Lighter overlay for better photo visibility
       doc.setFillColor(26, 35, 50);
-      doc.setGState(new doc.GState({opacity: 0.45}));
+      doc.setGState(new doc.GState({ opacity: 0.45 }));
       doc.rect(0, 0, W, bannerH, 'F');
-      doc.setGState(new doc.GState({opacity: 1}));
-    } catch(e) {
-      // Fallback: solid color banner
+      doc.setGState(new doc.GState({ opacity: 1 }));
+    } catch (e) {
       doc.setFillColor(...DARK_BLUE);
       doc.rect(0, 0, W, bannerH, 'F');
     }
-    
-    // Orange accent strip at bottom of banner
     doc.setFillColor(...ORANGE);
     doc.rect(0, bannerH, W, 2.5, 'F');
-    
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
     if (withLogo) {
-      // Logo groter en verticaal gecentreerd
       try { doc.addImage(LOGO_123BE, 'PNG', M, 10, 55, 18); } catch(e) {}
-      // Title rechts van logo, verticaal gecentreerd met logo
-      doc.setFont('helvetica', 'bold');
       doc.setFontSize(22);
-      doc.setTextColor(255, 255, 255);
       doc.text(title, M + 62, 24);
-      // Subtitle onder titel
       doc.setFontSize(10);
-      doc.setTextColor(230, 230, 230);
-      doc.text('Ground Research BV  |  123Bodemenergie', M + 62, 33);
+      doc.text('Ground Research BV | 123Bodemenergie', M + 62, 33);
     } else {
-      // Zonder logo: titel prominent gecentreerd
-      doc.setFont('helvetica', 'bold');
       doc.setFontSize(24);
-      doc.setTextColor(255, 255, 255);
       doc.text(title, M, 28);
-      // Subtitle
       doc.setFontSize(10);
-      doc.setTextColor(230, 230, 230);
-      doc.text('Ground Research BV  |  123Bodemenergie', M, 38);
+      doc.text('Ground Research BV | 123Bodemenergie', M, 38);
     }
-    
-    // Reset text color
     doc.setTextColor(0, 0, 0);
-    
-    return bannerH + 10; // Return starting Y position for content
+    return bannerH + 10;
   }
 
-  // ========== PAGINA 1: AANBIEDINGSBRIEF ==========
-  let y = addHeader('AANBIEDINGSBRIEF', true);
-  
-  // Klantgegevens links, kenmerk/datum rechts
-  y += 5;
+  function addCostTableRow(label, amount, y, even) {
+    if (even) {
+      doc.setFillColor(...LIGHT_GRAY);
+      doc.rect(M, y - 3, PW, 8, 'F');
+    }
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(label, M + 4, y + 2);
+    doc.text(eur(amount || 0), W - M - 4, y + 2, { align: 'right' });
+    return y + 8;
+  }
+
+  const clustersPdf = (d.clusters || []).map((c, i) => {
+    const calc = calculateCluster(c);
+    return { cluster: c, calc, idx: i + 1 };
+  });
+
+  // Pagina 1
+  let y = addHeader('AANBIEDINGSBRIEF', true) + 5;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  
-  // Klantgegevens links
   let leftY = y;
   if (d.klantNaam) { doc.text(d.klantNaam, M, leftY); leftY += 5; }
   if (d.tav) { doc.text('T.a.v. ' + d.tav, M, leftY); leftY += 5; }
   if (d.klantAdres) { doc.text(d.klantAdres, M, leftY); leftY += 5; }
-  
-  // Kenmerk/datum rechts
   doc.setFontSize(9);
   doc.text('Ons kenmerk: ' + (d.kenmerk || '-'), W - M, y, { align: 'right' });
   doc.text('Datum: ' + formatDate(d.datum), W - M, y + 5, { align: 'right' });
-  
   y = Math.max(leftY, y + 15);
-  
-  // Betreft
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.text('Betreft: ' + d.betreft, M, y);
-  y += 12;
-  
-  // Aanhef
+  doc.text('Betreft: ' + (d.betreft || ''), M, y);
+  y += 11;
+
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.text('Geachte heer/mevrouw,', M, y);
-  y += 10;
-  
-  // Inleidende tekst
-  const introText = 'Conform uw verzoek/aanvraag ontvangt u hierbij ons voorstel betreffende het plaatsen van een verticaal bodemwarmtewisselaar systeem voor een water/water warmtepomp.';
-  const lines = doc.splitTextToSize(introText, pw);
-  doc.text(lines, M, y);
-  y += lines.length * 5 + 15;
-  
-  // Specificaties in een nette tabel
+  y += 8;
+  const intro = doc.splitTextToSize('Conform uw aanvraag ontvangt u hierbij onze offerte voor het realiseren van een verticaal bodemenergiesysteem.', PW);
+  doc.text(intro, M, y);
+  y += (intro.length * 5) + 8;
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
-  doc.text('SPECIFICATIES', M, y);
-  y += 8;
-  
-  // Tabel header
-  doc.setFillColor(...MEDIUM_BLUE);
-  doc.rect(M, y - 4, pw, 8, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('OMSCHRIJVING', M + 3, y);
-  doc.text('WAARDE', W - M - 3, y, { align: 'right' });
-  doc.setTextColor(0, 0, 0);
-  y += 8;
-  
-  // Specificatie rijen
+  doc.text('Project samenvatting', M, y);
+  y += 7;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  const specs = [
-    ['Locatie bodemenergiesysteem', d.locatie || '-'],
-    ['Maximaal vermogen warmtepomp', `${d.vermogen} KW`],
-    ['Bodemzijdig vermogen', `${d.bodemvermogen.toFixed(2)} KW`],
-    ['Totaal boormeters', `${d.meters} m`],
-    ['Meters per boring', `${d.mpb.toFixed(1)} m`],
-    ['Aantal boringen', `${d.boringen}`],
-    ['Diameter bodemwarmtewisselaar', `${d.diameter}mm`],
-    ['Aantal pompen', `${d.pompen}`]
-  ];
-  
-  let specEven = false;
-  specs.forEach(spec => {
-    if (specEven) { 
-      doc.setFillColor(...LIGHT_GRAY); 
-      doc.rect(M, y - 3.5, pw, 6, 'F'); 
-    }
-    doc.text(spec[0], M + 3, y);
-    doc.text(spec[1], W - M - 3, y, { align: 'right' });
-    y += 6;
-    specEven = !specEven;
-  });
-  
-  y += 15;
-  
-  // Totaalbedrag (groot en oranje accent)
+  const totalMeters = clustersPdf.reduce((s, x) => s + x.calc.meters, 0);
+  doc.text(`Aantal clusters: ${clustersPdf.length}`, M, y); y += 5;
+  doc.text(`Totaal boormeters: ${totalMeters} m`, M, y); y += 5;
+  doc.text(`Locatie: ${d.locatie || '-'}`, M, y); y += 8;
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
   doc.setTextColor(...ORANGE);
-  const bedragTekst = `Het totaalbedrag van deze offerte bedraagt: ${eur(d.total)} exclusief BTW`;
-  doc.text(bedragTekst, M, y);
+  doc.text(`Totaalbedrag offerte: ${eur(d.total)} exclusief BTW`, M, y);
   doc.setTextColor(0, 0, 0);
-  y += 20;
-  
-  // Ondertekening + akkoordblok ALTIJD op pagina 1 — forceer positie onderaan
-  const H = doc.internal.pageSize.getHeight();
+
   const signBlockH = 55;
-  const signY = Math.max(y, H - 20 - signBlockH);
-  
-  // Ondertekening links
+  const signY = Math.max(y + 12, H - 20 - signBlockH);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.text('Met vriendelijke groet,', M, signY);
   doc.text('123bodemenergie / P. Groot, bedrijfsleider', M, signY + 8);
   doc.text('Tel.: 088-1262910 / Mob: 06 47 326 322', M, signY + 14);
-  
-  // Akkoordblok rechts — uitgelijnd met ondertekening
-  const akkoordW = 85;
-  const akkoordH = 50;
-  const akkoordX = W - M - akkoordW;
-  const akkoordY = signY - 4;
+
+  const akkoordW = 85, akkoordH = 50, akkoordX = W - M - akkoordW, akkoordY = signY - 4;
   doc.setDrawColor(...MEDIUM_BLUE);
   doc.setLineWidth(0.8);
   doc.rect(akkoordX, akkoordY, akkoordW, akkoordH);
-  
   doc.setFont('helvetica', 'bolditalic');
   doc.setFontSize(10);
   doc.text('Akkoord voor uitvoering:', akkoordX + 4, akkoordY + 8);
-  
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.text(d.klantNaam || '', akkoordX + 4, akkoordY + 16);
-  
-  // Handtekening lijn
-  doc.setLineWidth(0.3);
   doc.line(akkoordX + 4, akkoordY + 26, akkoordX + akkoordW - 4, akkoordY + 26);
   doc.text('Handtekening', akkoordX + 4, akkoordY + 31);
-  
-  // Datum lijn
   doc.line(akkoordX + 4, akkoordY + 40, akkoordX + akkoordW - 4, akkoordY + 40);
   doc.text('Datum', akkoordX + 4, akkoordY + 45);
-  
-  y = akkoordY + akkoordH + 5;
-  
-  addFooter(1);
+  addFooter();
 
-  // ========== PAGINA 2: KOSTENSPECIFICATIE ==========
+  // Pagina 2+
   doc.addPage();
-  y = addHeader('KOSTENSPECIFICATIE');
-  
-  // Tabel header
-  doc.setFillColor(...MEDIUM_BLUE);
-  doc.rect(M, y, pw, 10, 'F');
-  doc.setTextColor(255, 255, 255);
+  y = addHeader('KOSTENSPECIFICATIE', false);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text('OMSCHRIJVING', M + 4, y + 7);
-  doc.text('BEDRAG', W - M - 4, y + 7, { align: 'right' });
-  doc.setTextColor(0, 0, 0);
-  y += 12;
-  
-  // Kostentabel met zebra-stripes
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  const costLabels = {
-    boorkosten: 'Boorkosten', 
-    lussen: 'Prijs Lussen', 
-    grout: 'Grout',
-    gewichten: 'Gewichten', 
-    verdelerput: 'Verdelerput', 
-    aansluiten: 'Aansluiten bronnen',
-    glycol: 'Glycol', 
-    graafwerk: 'Graafwerk + kraan', 
-    transport: 'Transport',
-    barogel: 'Barogel', 
-    ezmud: 'EZ Mud', 
-    olo: 'OLO melding'
-  };
-  
-  let even = false;
-  COST_ITEMS.forEach(item => {
-    if (even) { 
-      doc.setFillColor(...LIGHT_GRAY); 
-      doc.rect(M, y - 3, pw, 8, 'F'); 
-    }
-    doc.text(costLabels[item.key] || item.key, M + 4, y + 2);
-    doc.text(eur(d.costs[item.key] || 0), W - M - 4, y + 2, { align: 'right' });
+  doc.setFontSize(12);
+  doc.text('Specificatie per cluster', M, y);
+  y += 8;
+
+  clustersPdf.forEach(item => {
+    if (y > 250) { addFooter(); doc.addPage(); y = addHeader('KOSTENSPECIFICATIE', false); }
+    const name = item.cluster.label || `Cluster ${item.idx}`;
+    doc.setFillColor(...MEDIUM_BLUE);
+    doc.rect(M, y - 4, PW, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text(`${name} - ${Number(item.cluster.vermogen || 0).toFixed(1)} kW`, M + 3, y + 1);
+    doc.setTextColor(0, 0, 0);
     y += 8;
-    even = !even;
-  });
-  
-  // Custom artikelen
-  if (d.customArtikelen && d.customArtikelen.length) {
-    d.customArtikelen.forEach(art => {
-      if (even) { 
-        doc.setFillColor(...LIGHT_GRAY); 
-        doc.rect(M, y - 3, pw, 8, 'F'); 
-      }
-      doc.text(art.naam || 'Extra artikel', M + 4, y + 2);
-      doc.text(eur(art.bedrag), W - M - 4, y + 2, { align: 'right' });
-      y += 8;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`Bronnen: ${item.calc.boringen} | Diepte/bron: ${item.calc.diepte}m | Diameter: ${item.calc.diameter}mm | Luslengte: ${item.calc.luslengte}m`, M + 3, y);
+    y += 5;
+    let even = false;
+    COST_ITEMS.forEach(ci => {
+      y = addCostTableRow(ci.label, item.calc.values[ci.key], y, even);
       even = !even;
     });
-  }
-  
-  // Totaalregel
-  y += 5;
-  doc.setDrawColor(...MEDIUM_BLUE);
-  doc.setLineWidth(1);
-  doc.line(M, y, W - M, y);
-  y += 10;
-  
+    y = addCostTableRow(`${name} subtotaal`, item.calc.total, y, true);
+    y += 5;
+  });
+
+  if (y > 245) { addFooter(); doc.addPage(); y = addHeader('KOSTENSPECIFICATIE', false); }
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
+  doc.text('Vrije regels', M, y);
+  y += 7;
+  let even = false;
+  (d.vrijeRegels || []).filter(r => (r.naam || '').trim()).forEach(r => {
+    y = addCostTableRow(r.naam, r.bedrag, y, even);
+    even = !even;
+  });
+  if (!(d.vrijeRegels || []).length) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text('Geen vrije regels toegevoegd.', M + 3, y);
+    y += 6;
+  }
+
+  y += 4;
+  if (y > 245) { addFooter(); doc.addPage(); y = addHeader('KOSTENSPECIFICATIE', false); }
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text('Kostenspecificatie totaal', M, y);
+  y += 7;
+
+  even = false;
+  clustersPdf.forEach(item => {
+    const name = item.cluster.label || `Cluster ${item.idx}`;
+    y = addCostTableRow(`${name} (${Number(item.cluster.vermogen || 0).toFixed(1)} kW)`, item.calc.total, y, even);
+    even = !even;
+  });
+  y = addCostTableRow('Transport', d.projectKosten?.transport || 0, y, even); even = !even;
+  y = addCostTableRow('Graafwerk + kraan', d.projectKosten?.graafwerk || 0, y, even); even = !even;
+  y = addCostTableRow('OLO melding', d.projectKosten?.olo || 0, y, even); even = !even;
+  (d.vrijeRegels || []).filter(r => (r.naam || '').trim()).forEach(r => {
+    y = addCostTableRow(r.naam, r.bedrag, y, even);
+    even = !even;
+  });
+
+  y += 4;
+  doc.setDrawColor(...MEDIUM_BLUE);
+  doc.line(M, y, W - M, y);
+  y += 8;
   doc.setFillColor(...LIGHT_GRAY);
-  doc.rect(M, y - 5, pw, 10, 'F');
+  doc.rect(M, y - 5, PW, 10, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
   doc.text('TOTAAL EXCL. BTW', M + 4, y + 2);
   doc.setTextColor(...ORANGE);
-  doc.text(eur(d.total), W - M - 4, y + 2, { align: 'right' });
+  doc.text(eur(d.total || 0), W - M - 4, y + 2, { align: 'right' });
   doc.setTextColor(0, 0, 0);
-  y += 15;
-  
-  // "Wat krijgt u voor deze kosten:" sectie
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.text('Wat krijgt u voor deze kosten:', M, y);
-  y += 8;
-  
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  const watKrijgtU = [
-    'Plaatsen warmtewisselaar tot afgesproken diepte',
-    'Versleping naar binnen tot 20cm boven vloerpeil max 20m',
-    'Oplevering met puntstuk',
-    'Lussen zijn gevuld met water/glycol mix 70/30%',
-    'Lussen zijn afgeperst',
-    'Opleverrapport met garantie bewijs',
-    'Tekening met XY coördinaten'
-  ];
-  
-  watKrijgtU.forEach(item => {
-    doc.text('•  ' + item, M + 4, y);
-    y += 6;
-  });
-  
-  addFooter(2);
 
-  // ========== PAGINA 3: UITGANGSPUNTEN ==========
-  doc.addPage();
-  y = addHeader('UITGANGSPUNTEN & VOORWAARDEN');
-  
-  // Uitgangspunten sectie
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(...MEDIUM_BLUE);
-  doc.text('Uitgangspunten aangeleverd door de klant', M, y);
-  doc.setTextColor(0, 0, 0);
-  y += 10;
-  
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  const uitgangspunten = [
-    `Aantal warmtepompen: ${d.pompen}`,
-    `Vermogen: ${d.vermogen} KW`,
-    `Bodemzijdig vermogen: ${d.bodemvermogen.toFixed(2)} KW`,
-    `Totaal boormeters: ${d.meters} m in ${d.boringen} boring(en)`,
-    `Bevoegd gezag: ${d.bevoegd}`
-  ];
-  
-  uitgangspunten.forEach(item => {
-    doc.text('•  ' + item, M + 4, y);
-    y += 6;
-  });
-  y += 10;
-  
-  // Opdrachtgever verzorgt sectie
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(...MEDIUM_BLUE);
-  doc.text('Opdrachtgever verzorgt de volgende punten:', M, y);
-  doc.setTextColor(0, 0, 0);
-  y += 10;
-  
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  const opdrachtgeverVerzorgt = [
-    'Toegang tot de locatie',
-    'Wateraansluiting met minimaal 3M³ per uur',
-    'Voldoende werkruimte voor machines en bussen en eventuele vergunningen hiervoor',
-    'Doorvoeren of gaten door funderingen',
-    'Aanleveren van een SPF verklaring om de OLO melding te kunnen doen',
-    'Verwijderen van straatwerk, planten, bomen of andere belemmeringen voor het boren'
-  ];
-  
-  opdrachtgeverVerzorgt.forEach(item => {
-    doc.text('•  ' + item, M + 4, y);
-    y += 6;
-  });
-  y += 10;
-  
-  // Niet opgenomen sectie
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(...MEDIUM_BLUE);
-  doc.text('Niet opgenomen in deze offerte:', M, y);
-  doc.setTextColor(0, 0, 0);
-  y += 10;
-  
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  const nietOpgenomen = [
-    'Gebruik van rijplaten',
-    'Parkeerkosten',
-    'Wegafzettingen'
-  ];
-  
-  nietOpgenomen.forEach(item => {
-    doc.text('•  ' + item, M + 4, y);
-    y += 6;
-  });
-  y += 10;
-  
-  // Waar moet u rekening mee houden sectie
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(...MEDIUM_BLUE);
-  doc.text('Waar moet u rekening mee houden:', M, y);
-  doc.setTextColor(0, 0, 0);
-  y += 10;
-  
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  
-  const rekeningMeeHouden1 = 'Wij mogen de grond die tijdens het boren vrijkomt niet meenemen, deze blijft achter op locatie. Het is wijs om een grondcontainer te bestellen, dit kan bij GP Groot in Heiloo. Voor de grootte van de container kan u altijd even contact met ons opnemen.';
-  let textLines = doc.splitTextToSize(rekeningMeeHouden1, pw - 8);
-  doc.text(textLines, M + 4, y);
-  y += textLines.length * 5 + 8;
-  
-  const rekeningMeeHouden2 = 'Boren tot grote diepte is niet niks, wij komen met groot materieel. Wij zullen er alles aan doen om dit zo netjes mogelijk te doen. Houd er rekening mee dat de tuin, oprit of bouwkavel behoorlijk geroerd zal zijn na afloop.';
-  textLines = doc.splitTextToSize(rekeningMeeHouden2, pw - 8);
-  doc.text(textLines, M + 4, y);
-  
-  addFooter(3);
-
-  // ========== PAGINA 4: ALGEMENE VOORWAARDEN + FACTURERING ==========
-  doc.addPage();
-  y = addHeader('ALGEMENE VOORWAARDEN & FACTURERING');
-  
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(...MEDIUM_BLUE);
-  doc.text('Algemene Voorwaarden', M, y);
-  doc.setTextColor(0, 0, 0);
-  y += 10;
-  
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  
-  const voorwaarden = [
-    'Meerwerk wordt uitsluitend uitgevoerd na overleg en toestemming van de opdrachtgever.',
-    'Kosten van vergunningen en leges zijn niet inbegrepen en worden apart verrekend.',
-    'De boorlocatie dient normaal toegankelijk te zijn voor onze boorinstallatie. Eventuele wachttijden worden in rekening gebracht tegen €225,- per uur exclusief BTW.',
-    'KLIC meldingen worden door Ground Research BV verzorgd.',
-    'Boorlocaties worden bepaald door Ground Research op basis van KLIC informatie.',
-    'Schade aan kabels en/of leidingen welke niet of onjuist geregistreerd staan bij het kadaster zijn niet verhaalbaar op Ground Research BV.',
-    'Aansprakelijkheid is te allen tijde gemaximeerd tot het bedrag van de opdracht.',
-    'Werkzaamheden worden uitgevoerd onder BRL2000/BRL2100/BRL11000 certificaat.',
-    'Scheidende lagen worden afgedicht volgens de richtlijnen van BRL2100.',
-    'Onafhankelijkheid moet ten alle tijden zijn geborgd. Ground Research keurt dus geen eigen grond (zie BRL 2000, BRL 2100 of BRL 11000 zie Functie scheiding).',
-    'De projectleider Ground Research beoordeelt alleen of de aangeleverde gegevens voldoende zijn om de werkzaamheden conform de BRL eis uit te voeren.',
-    'Garantie op ondergronds systeem 10 jaar. Prestatie garantie op bodemwisselaar van 25 jaar.',
-    'Voor klachten t.o.v. van BRL werkzaamheden kan u terecht bij Ground Research BV.'
-  ];
-  
-  let counter = 1;
-  voorwaarden.forEach(voorwaarde => {
-    const vlines = doc.splitTextToSize(`${counter}. ${voorwaarde}`, pw - 8);
-    doc.text(vlines, M + 4, y);
-    y += vlines.length * 4 + 2;
-    counter++;
-    
-    if (y > 220) {
-      doc.addPage();
-      y = 30;
-    }
-  });
-  
-  y += 15;
-  
-  // Facturering sectie
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(...MEDIUM_BLUE);
-  doc.text('Facturering', M, y);
-  doc.setTextColor(0, 0, 0);
-  y += 10;
-  
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  
-  doc.text('De kosten zullen volgens onderstaand schema worden verrekend:', M, y);
-  y += 8;
-  
-  doc.text('•  50% van de totale kosten na ontvangst van de opdrachtbevestiging;', M + 4, y);
-  y += 6;
-  doc.text('•  50% na oplevering werk.', M + 4, y);
-  y += 10;
-  
-  doc.text('Het factuurbedrag dient binnen 30 dagen op onze bankrekening te zijn overgemaakt.', M, y);
-  y += 6;
-  doc.text('Alle vermelde bedragen zijn exclusief BTW.', M, y);
-  y += 6;
-  doc.text('Dit voorstel geldt tot drie maanden na dato.', M, y);
-  
-  addFooter(4);
-
-  // Save/download
+  addFooter();
   const filename = `Offerte_${d.kenmerk || 'draft'}_${d.klantNaam || 'klant'}.pdf`.replace(/\s+/g, '_');
   doc.save(filename);
-  var offerteProject = ((d.kenmerk || '') + (d.locatie ? '-' + d.locatie : '')).trim() || 'draft';
+  const offerteProject = ((d.kenmerk || '') + (d.locatie ? '-' + d.locatie : '')).trim() || 'draft';
   uploadToDropbox(doc, filename, d.klantNaam || '', offerteProject, 'Offerte');
 }
 
@@ -1907,7 +1626,7 @@ function autoSaveAll() {
     const data = {};
     // Save all inputs, selects, textareas by id
     document.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
-      if (el.id.startsWith('km-') || el.id.startsWith('modal')) return; // skip modal fields
+      if (el.id.startsWith('km-') || el.id.startsWith('modal') || el.id.startsWith('bib')) return; // skip modal fields
       if (el.type === 'checkbox') {
         data[el.id] = el.checked;
       } else {
@@ -1926,6 +1645,10 @@ function autoSaveAll() {
       anders.push(el.value);
     });
     data._pvaAndersText = anders;
+    data._clusters = clusters;
+    data._clusterCounter = clusterCounter;
+    data._vrijeRegels = vrijeRegels;
+    data._vrijeRegelCounter = vrijeRegelCounter;
 
     localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
   }, AUTOSAVE_DELAY);
@@ -1957,12 +1680,26 @@ function autoRestoreAll() {
         if (data._pvaAndersText[i]) el.value = data._pvaAndersText[i];
       });
     }
-    // Migrate old glycol cans → liters: if old param-glycol-cans exists in data, reset glycol price
-    if (data['param-glycol-cans'] !== undefined || !data['param-glycol-liters']) {
-      const priceEl = document.getElementById('param-glycol-prijs');
-      if (priceEl) priceEl.value = eur(PARAM_DEFAULTS.glycol.prijsPerLiter);
-      costParams.glycol = JSON.parse(JSON.stringify(PARAM_DEFAULTS.glycol));
+    if (Array.isArray(data._clusters) && data._clusters.length) {
+      clusters = data._clusters.map((c, i) => ({
+        id: c.id || i + 1,
+        label: c.label || `Cluster ${i + 1}`,
+        vermogen: parseFloat(c.vermogen) || 0,
+        boringen: parseInt(c.boringen, 10) || 1,
+        diepte: parseFloat(c.diepte) || 0,
+        diameter: parseInt(c.diameter, 10) || 40,
+        luslengte: parseInt(c.luslengte, 10) || 165,
+        verdelerput: !!c.verdelerput
+      }));
+      clusterCounter = Math.max(data._clusterCounter || 0, ...clusters.map(c => c.id || 0));
+      renderClusters();
     }
+    if (Array.isArray(data._vrijeRegels)) {
+      vrijeRegels = data._vrijeRegels.map((r, i) => ({ id: r.id || i + 1, naam: r.naam || '', bedrag: parseFloat(r.bedrag) || 0 }));
+      vrijeRegelCounter = Math.max(data._vrijeRegelCounter || 0, vrijeRegels.length);
+      renderVrijeRegels();
+    }
+    calc();
   } catch (e) { /* ignore corrupt data */ }
 }
 
@@ -1978,6 +1715,9 @@ function init() {
 
   // Set today's date
   document.getElementById('f-datum').value = new Date().toISOString().substring(0, 10);
+  document.getElementById('f-transport').value = eur(costParams.transport.prijs);
+  document.getElementById('f-graafwerk').value = eur(costParams.graafwerk.prijs);
+  document.getElementById('f-olo').value = eur(costParams.olo.prijs);
 
   // Ensure klanten exist
   getKlanten();
@@ -1985,7 +1725,9 @@ function init() {
   // Build UI
   buildCostRows();
   populateKlantDropdown();
-  updateLusOpties();
+  populateBibSelect();
+  if (!clusters.length) addCluster();
+  renderVrijeRegels();
 
   // Initial calculation
   calc();
@@ -2775,6 +2517,8 @@ function initOpleverTab() {
 
 function copyOfferteToOplever() {
   // Kopieer data uit offerte-tab
+  const d = gatherOfferteData();
+  const firstCluster = d.clusters?.[0] || {};
   const v = id => (document.getElementById(id)?.value || '');
   const klantId = v('f-klant');
   if (klantId && klantId !== '__new__') {
@@ -2786,9 +2530,9 @@ function copyOfferteToOplever() {
   document.getElementById('opl-locatie').value = v('f-locatie');
   document.getElementById('opl-projectnr').value = v('f-kenmerk');
   document.getElementById('opl-telefoon').value = v('f-telefoon');
-  document.getElementById('opl-diameter').value = v('f-diameter');
-  document.getElementById('opl-luslengte').value = v('f-luslengte');
-  document.getElementById('opl-bronnen').value = v('f-boringen') || '1';
+  document.getElementById('opl-diameter').value = String(firstCluster.diameter || d.diameter || '40');
+  document.getElementById('opl-luslengte').value = String(firstCluster.luslengte || d.luslengte || '165');
+  document.getElementById('opl-bronnen').value = String(firstCluster.boringen || d.boringen || '1');
   document.getElementById('opl-datum').value = new Date().toISOString().substring(0, 10);
 
   // Kopieer PvA-velden indien beschikbaar
@@ -3437,3 +3181,5 @@ function generateOpleverPDF() {
   const oplProject = ((p.projectnr || '') + (p.locatie ? '-' + p.locatie : '')).trim() || 'draft';
   uploadToDropbox(pdf, filename, p.klant || '', oplProject, 'Opleverrapport');
 }
+
+

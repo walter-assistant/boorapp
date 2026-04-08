@@ -228,6 +228,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .cost-total { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 4px; margin-top: 8px; border-top: 3px solid #1e3a5f; }
 .cost-total .label { font-size: 16px; font-weight: 700; color: #1e3a5f; }
 .cost-total .amount { font-size: 22px; font-weight: 700; color: #1e3a5f; }
+.section-header { display:flex; justify-content:space-between; align-items:center; margin:18px 0 10px; }
+.section-header h2 { margin:0; padding:0; border:none; }
+.cluster-card { border:1px solid #d8e0ea; border-radius:8px; padding:14px; margin-bottom:12px; background:#fcfdff; }
+.cluster-title { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.cluster-title strong { color:#1e3a5f; }
+.cluster-meta { font-size:11px; color:#6b7280; margin-top:4px; }
+.vrije-row { display:grid; grid-template-columns: 1fr 150px auto; gap:8px; align-items:center; margin-bottom:8px; }
+.vrije-row input { padding:8px 10px; border:1px solid #d0d5dd; border-radius:5px; font-size:14px; }
+.mini-note { font-size:11px; color:#667085; }
 .btn { padding: 10px 20px; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
 .btn-primary { background: #1e3a5f; color: white; }
 .btn-primary:hover { background: #2a4f7f; }
@@ -326,61 +335,7 @@ const BOORAPP_HTML = `
           </div>
         </div>
 
-        <h2 style="margin-top:20px">Technische Specificaties</h2>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label>Max. vermogen warmtepomp (KW)</label>
-            <input type="number" id="f-vermogen" value="8" step="0.1" oninput="calc()">
-          </div>
-          <div class="form-group">
-            <label>Factor</label>
-            <input type="number" id="f-factor" value="0.8" step="0.05" oninput="calc()">
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label>Bodemzijdig vermogen (KW)</label>
-            <input type="number" id="f-bodemvermogen" readonly>
-          </div>
-          <div class="form-group">
-            <label>Aantal pompen</label>
-            <input type="number" id="f-pompen" value="1" min="1" oninput="calc()">
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label>Aantal boringen</label>
-            <input type="number" id="f-boringen" value="1" min="1" oninput="calc()">
-          </div>
-          <div class="form-group">
-            <label>Totaal boormeters</label>
-            <input type="number" id="f-meters" value="225" min="1" oninput="calc()">
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label>Meters per boring</label>
-            <input type="number" id="f-mpb" readonly>
-          </div>
-          <div class="form-group">
-            <label>Diameter bodemwarmtewisselaar</label>
-            <select id="f-diameter" onchange="updateLusOpties(); calc()">
-              <option value="32">32mm</option>
-              <option value="40" selected>40mm</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label>Luslengte (rollengte)</label>
-            <select id="f-luslengte" onchange="calc()">
-            </select>
-          </div>
+        <div class="form-row full">
           <div class="form-group">
             <label>Locatie boringen</label>
             <input type="text" id="f-locatie" placeholder="Adres boorlocatie">
@@ -392,15 +347,6 @@ const BOORAPP_HTML = `
               <div style="font-size:12px; font-weight:600; color:#1e3a5f; margin-bottom:6px;">WKO Tool</div>
               <div id="wko-log" style="font-size:11px; color:#555; max-height:120px; overflow-y:auto;"></div>
               <div id="wko-result" style="margin-top:8px; display:none;"></div>
-            </div>
-          </div>
-          <div class="form-group">
-            <div class="toggle-group">
-              <label class="toggle">
-                <input type="checkbox" id="f-verdelerput" onchange="calc()">
-                <span class="slider"></span>
-              </label>
-              <span style="font-size:13px;font-weight:500;">Aansluiten op verdelerput</span>
             </div>
           </div>
         </div>
@@ -426,16 +372,62 @@ const BOORAPP_HTML = `
             </select>
           </div>
         </div>
+
+        <div class="section-header">
+          <h2>Projectkosten (1x)</h2>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Transport</label>
+            <input type="text" id="f-transport" value="€ 1000,00" oninput="calc()">
+          </div>
+          <div class="form-group">
+            <label>Graafwerk + kraan</label>
+            <input type="text" id="f-graafwerk" value="€ 250,00" oninput="calc()">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>OLO melding</label>
+            <input type="text" id="f-olo" value="€ 200,00" oninput="calc()">
+          </div>
+          <div class="form-group">
+            <label></label>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <h2>Clusters</h2>
+          <button class="btn btn-sm btn-primary" onclick="addCluster()">+ Cluster toevoegen</button>
+        </div>
+        <div id="clusters-list"></div>
+
+        <div class="section-header">
+          <h2>Vrije Regels</h2>
+        </div>
+        <div class="form-row" style="margin-bottom:10px;">
+          <div class="form-group">
+            <label>Artikelenbibliotheek</label>
+            <select id="vrije-bib-select" onchange="addVrijeRegelFromBib(this)">
+              <option value="">Uit bibliotheek...</option>
+            </select>
+          </div>
+          <div class="form-group" style="justify-content:flex-end;">
+            <label>&nbsp;</label>
+            <button class="btn btn-sm btn-primary" onclick="openVrijeBibModal()">Bibliotheek beheren</button>
+          </div>
+        </div>
+        <div id="vrije-regels-list"></div>
+        <div style="margin-top:8px;">
+          <button class="btn btn-sm btn-primary" onclick="addVrijeRegel()">+ Vrije regel</button>
+        </div>
       </div>
 
       <!-- RECHTERKOLOM: KOSTENBEREKENING -->
       <div class="panel" id="calc-panel">
-        <h2>Kostenberekening</h2>
+        <h2>Kostenoverzicht</h2>
+        <div class="mini-note" style="margin-bottom:10px;">Totaal = som van alle clusters + projectkosten + vrije regels.</div>
         <div id="cost-rows"></div>
-        <div id="custom-cost-rows"></div>
-        <div style="margin-top:8px;">
-          <button class="btn btn-sm btn-primary" onclick="addCustomArtikel()" style="font-size:11px; padding:5px 12px;">+ Artikel toevoegen</button>
-        </div>
         <div class="cost-total">
           <span class="label">TOTAAL EXCL. BTW</span>
           <span class="amount" id="cost-total">€ 0,00</span>
@@ -1230,6 +1222,28 @@ const BOORAPP_HTML = `
     <div class="btn-group">
       <button class="btn btn-primary" onclick="saveKlant()">Opslaan</button>
       <button class="btn btn-danger" onclick="closeKlantModal()">Annuleren</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ARTIKELENBIBLIOTHEEK -->
+<div class="modal-overlay" id="vrije-bib-modal">
+  <div class="modal">
+    <h3>Artikelenbibliotheek</h3>
+    <div class="form-row">
+      <div class="form-group"><label>Omschrijving</label><input type="text" id="bibNaam" placeholder="Omschrijving artikel"></div>
+      <div class="form-group"><label>Eenheid</label><input type="text" id="bibEenheid" value="Stuk"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Prijs</label><input type="number" id="bibPrijs" placeholder="0.00" step="0.01"></div>
+      <div class="form-group" style="justify-content:flex-end;">
+        <label>&nbsp;</label>
+        <button class="btn btn-primary" onclick="addToBib()">Toevoegen</button>
+      </div>
+    </div>
+    <div id="bibList" style="margin-top:8px; border-top:1px solid #e6eaf0; padding-top:8px;"></div>
+    <div class="btn-group" style="margin-top:12px;">
+      <button class="btn btn-danger" onclick="closeVrijeBibModal()">Sluiten</button>
     </div>
   </div>
 </div>
