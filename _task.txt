@@ -1,0 +1,47 @@
+Je werkt in de Boorapp (Next.js + static JS). Hoofdbestand: public/boorapp.js (~4200 regels). Live: boorapp.vercel.app. Git repo aanwezig.
+
+TAAK: Vervang het hele 'Nieuwe Offerte' tabblad door een nieuwe, flexibele versie.
+
+PROBLEEM met huidige versie: gaat uit van 1 uniforme configuratie (X bronnen, allemaal zelfde diepte/diameter). Werkt niet voor projecten met meerdere warmtepompen van verschillend vermogen + verschillende dieptes.
+
+NIEUWE STRUCTUUR (Optie C - Hybride):
+
+1. CLUSTERS (onbeperkt aantal, knop 'Cluster toevoegen'):
+   Elk cluster heeft:
+   - Naam/label (bv 'WP1 - 17 kW')
+   - Warmtepomp vermogen (kW) - zichtbaar in PDF
+   - Aantal bronnen
+   - Diepte per bron (m)
+   - Diameter buis (mm)
+   - Auto-berekende boorkosten, grout, glycol, lussen per cluster (zelfde formules als nu)
+
+2. VRIJE REGELS SECTIE (onder clusters):
+   - Handmatig regels toevoegen (omschrijving + bedrag)
+   - Artikelenbibliotheek zoals in offerte-tool-gr (C:/Users/Walter/.openclaw/workspace/offerte-tool-gr) - bekijk die repo voor de implementatie, hergebruik patroon/storage
+   - Voor: verdelerput, meerwerk, kortingen, bijzonderheden, etc.
+
+3. TOTAAL = som van alle clusters + vrije regels
+
+4. WKO-TOOL KOPPELING: blijft op ADRES-niveau (niet per cluster!), zoals nu. Luslengte wordt bepaald door adres/locatie, niet per cluster.
+
+5. PDF OFFERTE:
+   - Pagina 1: begeleidende brief + totaalbedrag + 'Met vriendelijke groet' + akkoordblok (houd huidige fix: handtekening NIET in akkoordblok, blok altijd onderaan pagina 1)
+   - Pagina 2+: specificatie PER CLUSTER met kW vermogen zichtbaar, daarna vrije regels, daarna kostenspecificatie per cluster opgeteld
+   - Behoud huisstijl (blauw/oranje), header, footer
+
+BELANGRIJK:
+- Behoud bestaande Supabase opslag voor offertes (breid datamodel uit met clusters array + vrijeRegels array, backwards-compat: oude offertes blijven leesbaar door bij load één cluster te maken van oude velden)
+- Behoud Dropbox export
+- Behoud auto-save via localStorage
+- Run 'node --check public/boorapp.js' voor commit (verplicht!)
+- Commit met duidelijke message
+- Deploy: 'npx vercel --prod --yes' (auto-deploy staat UIT, dus handmatig!)
+
+Werk in: C:/Users/Walter/.openclaw/workspace/boorapp-vercel
+
+Begin met verkennen: lees public/boorapp.js rond het 'Nieuwe Offerte' tabblad en de PDF-generator offerte functie. Kijk ook kort naar offerte-tool-gr voor de artikelenbibliotheek-implementatie. Maak dan een plan, implementeer, test syntax, commit, deploy.
+
+Verwijder _task.txt aan het eind.
+
+Als je klaar bent, run exact dit commando om mij te notificeren:
+openclaw system event --text "Boorapp offerte-rewrite klaar" --wake now

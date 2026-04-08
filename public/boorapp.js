@@ -950,6 +950,45 @@ function updateClusterCardDisplay(c) {
   if (totaalEl) totaalEl.value = eur(meta.total);
   const metaEl = card.querySelector('.cluster-meta');
   if (metaEl) metaEl.textContent = `${meta.boringen} bron(nen) \u00d7 ${meta.diepte}m = ${meta.meters}m totaal \u2022 ${meta.diameter}mm \u2022 lus ${meta.luslengte}m`;
+  const bdEl = card.querySelector('.cluster-breakdown-body');
+  if (bdEl) bdEl.innerHTML = renderClusterBreakdown(meta);
+}
+
+function renderClusterBreakdown(meta) {
+  const v = meta.values;
+  const boorPPM = parseFloat(costParams.boorkosten.prijsPerMeter) || 0;
+  const autoLusPrijs = LUS_OPTIES[meta.diameter]?.[meta.luslengte] || 920;
+  const prijsPerLus = costParams.lussen.prijsPerLus !== null ? costParams.lussen.prijsPerLus : autoLusPrijs;
+  const groutAuto = (GROUT_PER_LUS[meta.luslengte] || Math.ceil(meta.diepte / 28)) * meta.boringen;
+  const groutZakken = costParams.grout.aantalZakken !== null ? costParams.grout.aantalZakken : groutAuto;
+  const groutPrijs = parseFloat(costParams.grout.prijsPerZak) || 0;
+  const gewAant = parseFloat(costParams.gewichten.aantal) || 0;
+  const gewPrijs = parseFloat(costParams.gewichten.prijsPerStuk) || 0;
+  const barogelAuto = (BAROGEL_PER_LUS[meta.luslengte] || Math.ceil(meta.diepte / 8.65)) * meta.boringen;
+  const barogelZakken = costParams.barogel.aantalZakken !== null ? costParams.barogel.aantalZakken : barogelAuto;
+  const barogelPrijs = parseFloat(costParams.barogel.prijsPerZak) || 0;
+  const diamM = meta.diameter === 32 ? 0.026 : 0.0326;
+  const totaleLusLengte = meta.luslengte * 2 * meta.boringen;
+  const inhoudL = Math.PI * Math.pow(diamM / 2, 2) * totaleLusLengte * 1000;
+  const glycolL = costParams.glycol.liters !== null ? costParams.glycol.liters : Math.ceil(inhoudL * 0.30);
+  const glycolPrijs = parseFloat(costParams.glycol.prijsPerLiter) || 0;
+  const rows = [
+    ['Boorkosten', `${meta.meters}m \u00d7 ${eur(boorPPM)}/m`, v.boorkosten],
+    ['Lussen', `${meta.boringen} \u00d7 ${eur(prijsPerLus)} (lus ${meta.luslengte}m)`, v.lussen],
+    ['Grout', `${groutZakken} zakken \u00d7 ${eur(groutPrijs)}`, v.grout],
+    ['Gewichten', `${gewAant} \u00d7 ${eur(gewPrijs)}`, v.gewichten],
+    ['Aansluiten bronnen', '', v.aansluiten]
+  ];
+  if (v.verdelerput > 0) rows.push(['Verdelerput', '', v.verdelerput]);
+  rows.push(['Glycol', `${glycolL}L \u00d7 ${eur(glycolPrijs)}/L`, v.glycol]);
+  rows.push(['Barogel', `${barogelZakken} zakken \u00d7 ${eur(barogelPrijs)}`, v.barogel]);
+  let html = '<table style="width:100%; border-collapse:collapse;">';
+  rows.forEach(r => {
+    html += `<tr><td style="padding:2px 0;">${r[0]}${r[1] ? ` <span style=\"color:#888; font-size:11px;\">(${r[1]})</span>` : ''}</td><td style="padding:2px 0; text-align:right; font-variant-numeric:tabular-nums;">${eur(r[2])}</td></tr>`;
+  });
+  html += `<tr style="border-top:1px solid #d0d6e0;"><td style="padding:4px 0 0; font-weight:700;">Totaal cluster</td><td style="padding:4px 0 0; text-align:right; font-weight:700;">${eur(meta.total)}</td></tr>`;
+  html += '</table>';
+  return html;
 }
 
 function renderClusters() {
@@ -1001,6 +1040,10 @@ function renderClusters() {
         </div>
       </div>
       <div class="cluster-meta">${meta.boringen} bron(nen) × ${meta.diepte}m = ${meta.meters}m totaal • ${meta.diameter}mm • lus ${meta.luslengte}m</div>
+      <details class="cluster-breakdown" style="margin-top:8px;">
+        <summary style="cursor:pointer; font-size:12px; color:#1e3a5f; font-weight:600;">▸ Opbouw bedrag bekijken</summary>
+        <div class="cluster-breakdown-body" style="margin-top:6px; padding:8px 10px; background:#f8f9fb; border-radius:6px; font-size:12px;">${renderClusterBreakdown(meta)}</div>
+      </details>
     `;
     container.appendChild(div);
   });
