@@ -812,10 +812,11 @@ function esc(s) {
 }
 
 function lusOptieHtml(diameter, selected) {
-  const opties = diameter === 32
-    ? [[110, '110m - €460,00'], [80, '80m - €287,50'], [50, '50m - €172,50']]
-    : [[225, '225m - €1.100,00'], [200, '200m - €1.190,25'], [185, '185m - €977,50'], [175, '175m - €948,75'], [165, '165m - €920,00'], [152, '152m - €862,50'], [138, '138m - €805,00'], [127, '127m - €632,50']];
-  return opties.map(([v, label]) => `<option value="${v}" ${parseInt(selected, 10) === v ? 'selected' : ''}>${label}</option>`).join('');
+  const lengtes = diameter === 32 ? [110, 80, 50] : [225, 200, 185, 175, 165, 152, 138, 127];
+  return lengtes.map(lus => {
+    const prijs = LUS_OPTIES[diameter]?.[lus] || (diameter === 40 ? 920 : 460);
+    return `<option value="${lus}" ${parseInt(selected, 10) === lus ? 'selected' : ''}>${lus}m - ${eur(prijs)}</option>`;
+  }).join('');
 }
 
 function getBib() { try { return JSON.parse(localStorage.getItem(BIB_KEY) || '[]'); } catch(e) { return []; } }
