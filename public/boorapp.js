@@ -1801,7 +1801,8 @@ function autoRestoreAll() {
         diepte: parseFloat(c.diepte) || 0,
         diameter: parseInt(c.diameter, 10) || 40,
         luslengte: parseInt(c.luslengte, 10) || 165,
-        verdelerput: !!c.verdelerput
+        verdelerput: !!c.verdelerput,
+        params: (c.params && typeof c.params === 'object') ? c.params : {}
       }));
       clusterCounter = Math.max(data._clusterCounter || 0, ...clusters.map(c => c.id || 0));
       renderClusters();
@@ -1819,6 +1820,29 @@ function attachAutoSave() {
   // Listen on the whole document for changes
   document.addEventListener('input', autoSaveAll);
   document.addEventListener('change', autoSaveAll);
+
+  // Flush pending autosave + make sure niets verloren gaat bij tab verlaten
+  const flushNow = () => {
+    try { if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; } } catch(e) {}
+    try { autoSaveAll(); } catch(e) {}
+  };
+  window.addEventListener('pagehide', flushNow);
+  window.addEventListener('beforeunload', flushNow);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushNow();
+    else if (document.visibilityState === 'visible') {
+      // Terug op de tab: herstel gegevens uit localStorage zodat niets "weg" lijkt
+      try { autoRestoreAll(); } catch(e) {}
+      try { renderClusters(); renderVrijeRegels(); calc(); } catch(e) {}
+    }
+  });
+  // Mobile Safari: bfcache restore
+  window.addEventListener('pageshow', (ev) => {
+    if (ev.persisted) {
+      try { autoRestoreAll(); } catch(e) {}
+      try { renderClusters(); renderVrijeRegels(); calc(); } catch(e) {}
+    }
+  });
 }
 
 function init() {
