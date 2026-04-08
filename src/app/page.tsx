@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, memo } from 'react';
 import { supabase, loadUserData, saveUserData, saveAllUserData, DATA_KEYS } from '@/lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 
@@ -9,18 +9,30 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [dataLoaded, setDataLoaded] = useState(false);
   const scriptLoaded = useRef(false);
+  const sessionRef = useRef<Session | null>(null);
 
   // Auth
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
+      sessionRef.current = session;
       setSession(session);
       setLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (!session) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      const prevUserId = sessionRef.current?.user?.id || null;
+      const nextUserId = nextSession?.user?.id || null;
+      sessionRef.current = nextSession;
+
+      // Alleen rerenderen als gebruiker echt wisselt of uitlogt.
+      // Token refresh / tab focus moet de DOM van BoorApp met rust laten.
+      if (!nextSession) {
+        setSession(null);
         setDataLoaded(false);
         scriptLoaded.current = false;
+        return;
+      }
+      if (prevUserId !== nextUserId) {
+        setSession(nextSession);
       }
     });
     return () => subscription.unsubscribe();
@@ -78,7 +90,7 @@ export default function Page() {
   if (!session) return <LoginPage />;
   if (!dataLoaded) return <LoadingScreen message="Data laden..." />;
 
-  return <BoorAppShell userEmail={session.user.email || ''} />;
+  return <MemoBoorAppShell userEmail={session.user.email || ''} />;
 }
 
 // ============= LOGIN =============
@@ -164,6 +176,8 @@ function LoadingScreen({ message = 'Laden...' }: { message?: string }) {
 }
 
 // ============= APP SHELL =============
+const MemoBoorAppShell = memo(BoorAppShell, (prev, next) => prev.userEmail === next.userEmail);
+
 function BoorAppShell({ userEmail }: { userEmail: string }) {
   const handleLogout = async () => {
     const userId = (window as any).__supabaseUserId;
