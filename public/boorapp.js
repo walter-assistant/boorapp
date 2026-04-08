@@ -1566,16 +1566,10 @@ function generatePDF() {
   doc.setTextColor(0, 0, 0);
   y += 20;
   
-  // Check of er genoeg ruimte is voor ondertekening + akkoordblok (minimaal 65mm nodig)
+  // Ondertekening + akkoordblok ALTIJD op pagina 1 — forceer positie onderaan
   const H = doc.internal.pageSize.getHeight();
-  if (y + 65 > H - 20) {
-    addFooter(doc.internal.getCurrentPageInfo().pageNumber);
-    doc.addPage();
-    y = addHeader('');
-  }
-  
-  // Startpunt voor ondertekening + akkoordblok
-  const signY = y;
+  const signBlockH = 55;
+  const signY = Math.max(y, H - 20 - signBlockH);
   
   // Ondertekening links
   doc.setFont('helvetica', 'normal');
@@ -1605,7 +1599,6 @@ function generatePDF() {
   doc.setLineWidth(0.3);
   doc.line(akkoordX + 4, akkoordY + 26, akkoordX + akkoordW - 4, akkoordY + 26);
   doc.text('Handtekening', akkoordX + 4, akkoordY + 31);
-  addSignature(doc, akkoordX + 4, akkoordY + 18, 30, 10);
   
   // Datum lijn
   doc.line(akkoordX + 4, akkoordY + 40, akkoordX + akkoordW - 4, akkoordY + 40);
