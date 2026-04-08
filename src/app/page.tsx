@@ -63,7 +63,7 @@ export default function Page() {
         (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         const script = document.createElement('script');
         script.id = 'boorapp-script';
-        script.src = '/boorapp.js?v=3.0.1';
+        script.src = '/boorapp.js?v=' + Date.now();
         script.async = false;
         document.body.appendChild(script);
       };
