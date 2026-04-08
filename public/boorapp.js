@@ -958,35 +958,45 @@ function updateClusterCardDisplay(c) {
 
 function renderClusterBreakdown(c, meta) {
   const v = meta.values;
-  const ov = meta.overrides || {};
-  const boorPPM = parseFloat(costParams.boorkosten.prijsPerMeter) || 0;
-  const groutPrijs = parseFloat(costParams.grout.prijsPerZak) || 0;
-  const gewAant = parseFloat(costParams.gewichten.aantal) || 0;
-  const gewPrijs = parseFloat(costParams.gewichten.prijsPerStuk) || 0;
-  const barogelPrijs = parseFloat(costParams.barogel.prijsPerZak) || 0;
-  const glycolPrijs = parseFloat(costParams.glycol.prijsPerLiter) || 0;
-  const rows = [
-    ['boorkosten', 'Boorkosten', `${meta.meters}m \u00d7 ${eur(boorPPM)}/m`],
-    ['lussen', 'Lussen', `${meta.boringen} \u00d7 ${eur(meta.prijsPerLus)} (lus ${meta.luslengte}m)`],
-    ['grout', 'Grout', `${meta.groutZakken} zakken \u00d7 ${eur(groutPrijs)}`],
-    ['gewichten', 'Gewichten', `${gewAant} \u00d7 ${eur(gewPrijs)}`],
-    ['aansluiten', 'Aansluiten bronnen', '']
-  ];
-  if (v.verdelerput > 0 || ov.verdelerput !== undefined) rows.push(['verdelerput', 'Verdelerput', '']);
-  rows.push(['glycol', 'Glycol', `${meta.glycolL}L \u00d7 ${eur(glycolPrijs)}/L`]);
-  rows.push(['barogel', 'Barogel', `${meta.barogelZakken} zakken \u00d7 ${eur(barogelPrijs)}`]);
+  const prm = meta.prm;
+  const ov = meta.overridden;
+  const id = c.id;
+
+  function num(paramKey, value, suffix, width) {
+    const isOv = ov[paramKey];
+    const w = width || 70;
+    const style = `width:${w}px; text-align:right; font-variant-numeric:tabular-nums; padding:2px 4px; border:1px solid ${isOv ? '#c67600' : '#d0d6e0'}; border-radius:4px; background:${isOv ? '#fff8ec' : '#fff'};`;
+    const reset = isOv ? `<button type="button" title="Terug naar auto" onclick="resetClusterParam(${id}, '${paramKey}')" style="margin-left:3px; border:none; background:transparent; color:#c67600; cursor:pointer; font-size:12px;">\u21bb</button>` : '';
+    return `<input type="text" value="${value}" style="${style}" onchange="setClusterParam(${id}, '${paramKey}', this.value)">${suffix || ''}${reset}`;
+  }
+
+  const rows = [];
+  // Boorkosten: meters (auto) x prijs/m (editable)
+  rows.push(['Boorkosten', `${meta.meters}m \u00d7 ${num('boorPrijsPerMeter', prm.boorPrijsPerMeter.toFixed(2), '/m', 60)}`, v.boorkosten]);
+  // Lussen: aantal bronnen (auto) x prijs per lus (editable)
+  rows.push(['Lussen', `${meta.boringen} \u00d7 ${num('prijsPerLus', prm.prijsPerLus.toFixed(2), '', 75)} <span style="color:#888; font-size:11px;">(lus ${meta.luslengte}m)</span>`, v.lussen]);
+  // Grout: aantal (editable) x prijs (editable)
+  rows.push(['Grout', `${num('groutZakken', prm.groutZakken, ' zk', 50)} \u00d7 ${num('groutPrijsPerZak', prm.groutPrijsPerZak.toFixed(2), '', 70)}`, v.grout]);
+  // Gewichten
+  rows.push(['Gewichten', `${num('gewichtenAantal', prm.gewichtenAantal, 'st', 45)} \u00d7 ${num('gewichtenPrijs', prm.gewichtenPrijs.toFixed(2), '', 70)}`, v.gewichten]);
+  // Aansluiten
+  rows.push(['Aansluiten bronnen', num('aansluitenPrijs', prm.aansluitenPrijs.toFixed(2), '', 80), v.aansluiten]);
+  // Verdelerput (alleen als aan)
+  if (meta.verdelerput) {
+    rows.push(['Verdelerput', num('verdelerputPrijs', prm.verdelerputPrijs.toFixed(2), '', 80), v.verdelerput]);
+  }
+  // Glycol
+  rows.push(['Glycol', `${num('glycolLiters', prm.glycolLiters, 'L', 50)} \u00d7 ${num('glycolPrijs', prm.glycolPrijs.toFixed(2), '/L', 65)}`, v.glycol]);
+  // Barogel
+  rows.push(['Barogel', `${num('barogelZakken', prm.barogelZakken, 'zk', 50)} \u00d7 ${num('barogelPrijs', prm.barogelPrijs.toFixed(2), '', 70)}`, v.barogel]);
+
   let html = '<table style="width:100%; border-collapse:collapse;">';
   rows.forEach(r => {
-    const [key, label, hint] = r;
-    const overridden = ov[key] !== undefined;
-    const bedrag = v[key];
-    const inputStyle = `width:95px; text-align:right; font-variant-numeric:tabular-nums; padding:2px 4px; border:1px solid ${overridden ? '#c67600' : '#d0d6e0'}; border-radius:4px; background:${overridden ? '#fff8ec' : '#fff'};`;
-    const resetBtn = overridden ? `<button type="button" title="Terug naar auto" onclick="resetClusterOverride(${c.id}, '${key}')" style="margin-left:4px; border:none; background:transparent; color:#c67600; cursor:pointer; font-size:12px;">\u21bb</button>` : '';
-    html += `<tr><td style="padding:3px 0;">${label}${hint ? ` <span style=\"color:#888; font-size:11px;\">(${hint})</span>` : ''}</td><td style="padding:3px 0; text-align:right; white-space:nowrap;"><input type="text" value="${eur(bedrag)}" style="${inputStyle}" onchange="setClusterOverride(${c.id}, '${key}', this.value)">${resetBtn}</td></tr>`;
+    html += `<tr><td style="padding:4px 0; vertical-align:middle; width:130px;">${r[0]}</td><td style="padding:4px 0; vertical-align:middle;">${r[1]}</td><td style="padding:4px 0; text-align:right; vertical-align:middle; font-variant-numeric:tabular-nums; white-space:nowrap;">${eur(r[2])}</td></tr>`;
   });
-  html += `<tr style="border-top:1px solid #d0d6e0;"><td style="padding:6px 0 0; font-weight:700;">Totaal cluster</td><td style="padding:6px 0 0; text-align:right; font-weight:700;">${eur(meta.total)}</td></tr>`;
+  html += `<tr style="border-top:1px solid #d0d6e0;"><td colspan="2" style="padding:6px 0 0; font-weight:700;">Totaal cluster</td><td style="padding:6px 0 0; text-align:right; font-weight:700;">${eur(meta.total)}</td></tr>`;
   html += '</table>';
-  html += '<div style="font-size:11px; color:#888; margin-top:4px;">Tip: oranje veld = handmatig overschreven. Klik \u21bb om terug te zetten naar auto.</div>';
+  html += '<div style="font-size:11px; color:#888; margin-top:6px;">Tip: oranje veld = handmatig aangepast. Klik \u21bb om terug te zetten naar auto.</div>';
   return html;
 }
 
@@ -1090,53 +1100,74 @@ function calculateCluster(cluster) {
   const diameter = parseInt(cluster.diameter, 10) || 40;
   const luslengte = parseInt(cluster.luslengte, 10) || 165;
   const verdelerput = !!cluster.verdelerput;
-  const boorPPM = parseFloat(costParams.boorkosten.prijsPerMeter) || 0;
+  const p = cluster.params || {};
+  // Defaults
+  const defBoorPPM = parseFloat(costParams.boorkosten.prijsPerMeter) || 0;
   const autoLusPrijs = LUS_OPTIES[diameter]?.[luslengte] || 920;
-  const prijsPerLus = costParams.lussen.prijsPerLus !== null ? costParams.lussen.prijsPerLus : autoLusPrijs;
-  const groutAuto = (GROUT_PER_LUS[luslengte] || Math.ceil(diepte / 28)) * boringen;
-  const groutZakken = costParams.grout.aantalZakken !== null ? costParams.grout.aantalZakken : groutAuto;
-  const barogelAuto = (BAROGEL_PER_LUS[luslengte] || Math.ceil(diepte / 8.65)) * boringen;
-  const barogelZakken = costParams.barogel.aantalZakken !== null ? costParams.barogel.aantalZakken : barogelAuto;
+  const defLusPrijs = costParams.lussen.prijsPerLus !== null ? costParams.lussen.prijsPerLus : autoLusPrijs;
+  const defGroutZak = (GROUT_PER_LUS[luslengte] || Math.ceil(diepte / 28)) * boringen;
+  const defGroutPrijs = parseFloat(costParams.grout.prijsPerZak) || 0;
+  const defGewAant = parseFloat(costParams.gewichten.aantal) || 0;
+  const defGewPrijs = parseFloat(costParams.gewichten.prijsPerStuk) || 0;
+  const defVerdPrijs = parseFloat(costParams.verdelerput.prijs) || 0;
+  const defAansluit = parseFloat(costParams.aansluiten.prijs) || 0;
+  const defBarogelZak = (BAROGEL_PER_LUS[luslengte] || Math.ceil(diepte / 8.65)) * boringen;
+  const defBarogelPrijs = parseFloat(costParams.barogel.prijsPerZak) || 0;
   const diamM = diameter === 32 ? 0.026 : 0.0326;
   const totaleLusLengte = luslengte * 2 * boringen;
   const inhoudL = Math.PI * Math.pow(diamM / 2, 2) * totaleLusLengte * 1000;
-  const glycolL = costParams.glycol.liters !== null ? costParams.glycol.liters : Math.ceil(inhoudL * 0.30);
-  const auto = {
-    boorkosten: meters * boorPPM,
-    lussen: prijsPerLus * boringen,
-    grout: groutZakken * (parseFloat(costParams.grout.prijsPerZak) || 0),
-    gewichten: (parseFloat(costParams.gewichten.aantal) || 0) * (parseFloat(costParams.gewichten.prijsPerStuk) || 0),
-    verdelerput: verdelerput ? (parseFloat(costParams.verdelerput.prijs) || 0) : 0,
-    aansluiten: parseFloat(costParams.aansluiten.prijs) || 0,
-    glycol: glycolL * (parseFloat(costParams.glycol.prijsPerLiter) || 0),
-    barogel: barogelZakken * (parseFloat(costParams.barogel.prijsPerZak) || 0)
+  const defGlycolL = Math.ceil(inhoudL * 0.30);
+  const defGlycolPrijs = parseFloat(costParams.glycol.prijsPerLiter) || 0;
+  // Apply overrides (undefined => use default)
+  const prm = {
+    boorPrijsPerMeter: p.boorPrijsPerMeter !== undefined ? Number(p.boorPrijsPerMeter) : defBoorPPM,
+    prijsPerLus:       p.prijsPerLus       !== undefined ? Number(p.prijsPerLus)       : defLusPrijs,
+    groutZakken:       p.groutZakken       !== undefined ? Number(p.groutZakken)       : defGroutZak,
+    groutPrijsPerZak:  p.groutPrijsPerZak  !== undefined ? Number(p.groutPrijsPerZak)  : defGroutPrijs,
+    gewichtenAantal:   p.gewichtenAantal   !== undefined ? Number(p.gewichtenAantal)   : defGewAant,
+    gewichtenPrijs:    p.gewichtenPrijs    !== undefined ? Number(p.gewichtenPrijs)    : defGewPrijs,
+    verdelerputPrijs:  p.verdelerputPrijs  !== undefined ? Number(p.verdelerputPrijs)  : defVerdPrijs,
+    aansluitenPrijs:   p.aansluitenPrijs   !== undefined ? Number(p.aansluitenPrijs)   : defAansluit,
+    glycolLiters:      p.glycolLiters      !== undefined ? Number(p.glycolLiters)      : defGlycolL,
+    glycolPrijs:       p.glycolPrijs       !== undefined ? Number(p.glycolPrijs)       : defGlycolPrijs,
+    barogelZakken:     p.barogelZakken     !== undefined ? Number(p.barogelZakken)     : defBarogelZak,
+    barogelPrijs:      p.barogelPrijs      !== undefined ? Number(p.barogelPrijs)      : defBarogelPrijs
   };
-  const ov = cluster.overrides || {};
-  const values = {};
-  Object.keys(auto).forEach(k => { values[k] = (ov[k] !== undefined && ov[k] !== null) ? Number(ov[k]) : auto[k]; });
+  const values = {
+    boorkosten: meters * prm.boorPrijsPerMeter,
+    lussen: prm.prijsPerLus * boringen,
+    grout: prm.groutZakken * prm.groutPrijsPerZak,
+    gewichten: prm.gewichtenAantal * prm.gewichtenPrijs,
+    verdelerput: verdelerput ? prm.verdelerputPrijs : 0,
+    aansluiten: prm.aansluitenPrijs,
+    glycol: prm.glycolLiters * prm.glycolPrijs,
+    barogel: prm.barogelZakken * prm.barogelPrijs
+  };
   let total = 0;
   Object.values(values).forEach(v => { total += v; });
-  return { boringen, diepte, meters, diameter, luslengte, values, auto, total, overrides: ov, glycolL, groutZakken, barogelZakken, prijsPerLus };
+  const overridden = {};
+  Object.keys(prm).forEach(k => { overridden[k] = p[k] !== undefined; });
+  return { boringen, diepte, meters, diameter, luslengte, verdelerput, values, total, prm, overridden };
 }
 
-function setClusterOverride(id, key, raw) {
+function setClusterParam(id, key, raw) {
   const c = clusters.find(x => x.id === id);
   if (!c) return;
-  if (!c.overrides) c.overrides = {};
+  if (!c.params) c.params = {};
   const num = parseEur(raw);
   if (raw === '' || raw === null || isNaN(num)) {
-    delete c.overrides[key];
+    delete c.params[key];
   } else {
-    c.overrides[key] = num;
+    c.params[key] = num;
   }
   updateClusterCardDisplay(c);
   calc();
 }
 
-function resetClusterOverride(id, key) {
+function resetClusterParam(id, key) {
   const c = clusters.find(x => x.id === id);
-  if (!c || !c.overrides) return;
-  delete c.overrides[key];
+  if (!c || !c.params) return;
+  delete c.params[key];
   renderClusters();
   calc();
 }
