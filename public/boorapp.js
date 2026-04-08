@@ -980,7 +980,7 @@ function renderClusterBreakdown(c, meta) {
   // Gewichten
   rows.push(['Gewichten', `${num('gewichtenAantal', prm.gewichtenAantal, 'st', 45)} \u00d7 ${num('gewichtenPrijs', prm.gewichtenPrijs.toFixed(2), '', 70)}`, v.gewichten]);
   // Aansluiten
-  rows.push(['Aansluiten bronnen', num('aansluitenPrijs', prm.aansluitenPrijs.toFixed(2), '', 80), v.aansluiten]);
+  rows.push(['Aansluiten bronnen', `${num('aansluitenAantal', prm.aansluitenAantal, 'st', 45)} \u00d7 ${num('aansluitenPrijs', prm.aansluitenPrijs.toFixed(2), '', 70)}`, v.aansluiten]);
   // Verdelerput (alleen als aan)
   if (meta.verdelerput) {
     rows.push(['Verdelerput', num('verdelerputPrijs', prm.verdelerputPrijs.toFixed(2), '', 80), v.verdelerput]);
@@ -1127,6 +1127,7 @@ function calculateCluster(cluster) {
     gewichtenAantal:   p.gewichtenAantal   !== undefined ? Number(p.gewichtenAantal)   : defGewAant,
     gewichtenPrijs:    p.gewichtenPrijs    !== undefined ? Number(p.gewichtenPrijs)    : defGewPrijs,
     verdelerputPrijs:  p.verdelerputPrijs  !== undefined ? Number(p.verdelerputPrijs)  : defVerdPrijs,
+    aansluitenAantal:  p.aansluitenAantal  !== undefined ? Number(p.aansluitenAantal)  : 1,
     aansluitenPrijs:   p.aansluitenPrijs   !== undefined ? Number(p.aansluitenPrijs)   : defAansluit,
     glycolLiters:      p.glycolLiters      !== undefined ? Number(p.glycolLiters)      : defGlycolL,
     glycolPrijs:       p.glycolPrijs       !== undefined ? Number(p.glycolPrijs)       : defGlycolPrijs,
@@ -1139,7 +1140,7 @@ function calculateCluster(cluster) {
     grout: prm.groutZakken * prm.groutPrijsPerZak,
     gewichten: prm.gewichtenAantal * prm.gewichtenPrijs,
     verdelerput: verdelerput ? prm.verdelerputPrijs : 0,
-    aansluiten: prm.aansluitenPrijs,
+    aansluiten: prm.aansluitenAantal * prm.aansluitenPrijs,
     glycol: prm.glycolLiters * prm.glycolPrijs,
     barogel: prm.barogelZakken * prm.barogelPrijs
   };
