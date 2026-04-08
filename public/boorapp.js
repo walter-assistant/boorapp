@@ -936,8 +936,20 @@ function syncClusterField(id, key, value) {
     if (c.diameter === 32 && ![50, 80, 110].includes(parseInt(c.luslengte, 10))) c.luslengte = 110;
     if (c.diameter === 40 && ![127, 138, 152, 165, 175, 185, 200, 225].includes(parseInt(c.luslengte, 10))) c.luslengte = 165;
     renderClusters();
+  } else {
+    updateClusterCardDisplay(c);
   }
   calc();
+}
+
+function updateClusterCardDisplay(c) {
+  const card = document.querySelector('[data-cluster-id="' + c.id + '"]');
+  if (!card) return;
+  const meta = calculateCluster(c);
+  const totaalEl = card.querySelector('.cluster-totaal-input');
+  if (totaalEl) totaalEl.value = eur(meta.total);
+  const metaEl = card.querySelector('.cluster-meta');
+  if (metaEl) metaEl.textContent = `${meta.boringen} bron(nen) \u00d7 ${meta.diepte}m = ${meta.meters}m totaal \u2022 ${meta.diameter}mm \u2022 lus ${meta.luslengte}m`;
 }
 
 function renderClusters() {
@@ -948,6 +960,7 @@ function renderClusters() {
     const meta = calculateCluster(c);
     const div = document.createElement('div');
     div.className = 'cluster-card';
+    div.setAttribute('data-cluster-id', c.id);
     div.innerHTML = `
       <div class="cluster-title">
         <strong>${esc(c.label || `Cluster ${idx + 1}`)}</strong>
@@ -984,7 +997,7 @@ function renderClusters() {
         </div>
         <div class="form-group">
           <label>Cluster totaal</label>
-          <input type="text" readonly value="${eur(meta.total)}">
+          <input type="text" readonly class="cluster-totaal-input" value="${eur(meta.total)}">
         </div>
       </div>
       <div class="cluster-meta">${meta.boringen} bron(nen) × ${meta.diepte}m = ${meta.meters}m totaal • ${meta.diameter}mm • lus ${meta.luslengte}m</div>
