@@ -1533,7 +1533,8 @@ function generatePDF() {
       doc.setFontSize(10);
       doc.text('Ground Research BV | 123Bodemenergie', M + 62, 33);
     } else {
-      doc.setFontSize(24);
+      var titleSize = title.length > 24 ? 18 : 24;
+      doc.setFontSize(titleSize);
       doc.text(title, M, 28);
       doc.setFontSize(10);
       doc.text('Ground Research BV | 123Bodemenergie', M, 38);
