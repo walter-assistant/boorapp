@@ -1710,6 +1710,143 @@ function generatePDF() {
   doc.setTextColor(0, 0, 0);
 
   addFooter();
+
+  // ========== PAGINA 3: UITGANGSPUNTEN & VOORWAARDEN ==========
+  doc.addPage();
+  y = addHeader('UITGANGSPUNTEN & VOORWAARDEN', false);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...MEDIUM_BLUE);
+  doc.text('Uitgangspunten aangeleverd door de klant', M, y);
+  doc.setTextColor(0, 0, 0);
+  y += 8;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  const uitgangspunten = [
+    `Aantal clusters: ${clustersPdf.length}`,
+    `Totaal boormeters: ${totalMeters} m`,
+    `Locatie: ${d.locatie || '-'}`
+  ];
+  uitgangspunten.forEach(item => { doc.text('\u2022  ' + item, M + 4, y); y += 6; });
+  y += 8;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...MEDIUM_BLUE);
+  doc.text('Opdrachtgever verzorgt de volgende punten:', M, y);
+  doc.setTextColor(0, 0, 0);
+  y += 8;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  const opdrachtgeverVerzorgt = [
+    'Toegang tot de locatie',
+    'Wateraansluiting met minimaal 3 m\u00b3 per uur',
+    'Voldoende werkruimte voor machines en bussen en eventuele vergunningen hiervoor',
+    'Doorvoeren of gaten door funderingen',
+    'Aanleveren van een SPF verklaring om de OLO melding te kunnen doen',
+    'Verwijderen van straatwerk, planten, bomen of andere belemmeringen voor het boren'
+  ];
+  opdrachtgeverVerzorgt.forEach(item => { doc.text('\u2022  ' + item, M + 4, y); y += 6; });
+  y += 8;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...MEDIUM_BLUE);
+  doc.text('Niet opgenomen in deze offerte:', M, y);
+  doc.setTextColor(0, 0, 0);
+  y += 8;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  ['Gebruik van rijplaten', 'Parkeerkosten', 'Wegafzettingen'].forEach(item => { doc.text('\u2022  ' + item, M + 4, y); y += 6; });
+  y += 8;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...MEDIUM_BLUE);
+  doc.text('Waar moet u rekening mee houden:', M, y);
+  doc.setTextColor(0, 0, 0);
+  y += 8;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  const rmh1 = 'Wij mogen de grond die tijdens het boren vrijkomt niet meenemen, deze blijft achter op locatie. Het is wijs om een grondcontainer te bestellen, dit kan bij GP Groot in Heiloo. Voor de grootte van de container kunt u altijd even contact met ons opnemen.';
+  let rmhLines = doc.splitTextToSize(rmh1, PW - 8);
+  doc.text(rmhLines, M + 4, y);
+  y += rmhLines.length * 5 + 6;
+
+  const rmh2 = 'Boren tot grote diepte is niet niks, wij komen met groot materieel. Wij zullen er alles aan doen om dit zo netjes mogelijk te doen. Houd er rekening mee dat de tuin, oprit of bouwkavel behoorlijk geroerd zal zijn na afloop.';
+  rmhLines = doc.splitTextToSize(rmh2, PW - 8);
+  doc.text(rmhLines, M + 4, y);
+
+  addFooter();
+
+  // ========== PAGINA 4: ALGEMENE VOORWAARDEN & FACTURERING ==========
+  doc.addPage();
+  y = addHeader('ALGEMENE VOORWAARDEN & FACTURERING', false);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...MEDIUM_BLUE);
+  doc.text('Algemene Voorwaarden', M, y);
+  doc.setTextColor(0, 0, 0);
+  y += 8;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  const voorwaarden = [
+    'Meerwerk wordt uitsluitend uitgevoerd na overleg en toestemming van de opdrachtgever.',
+    'Kosten van vergunningen en leges zijn niet inbegrepen en worden apart verrekend.',
+    'De boorlocatie dient normaal toegankelijk te zijn voor onze boorinstallatie. Eventuele wachttijden worden in rekening gebracht tegen \u20ac225,- per uur exclusief BTW.',
+    'KLIC meldingen worden door Ground Research BV verzorgd.',
+    'Boorlocaties worden bepaald door Ground Research op basis van KLIC informatie.',
+    'Schade aan kabels en/of leidingen welke niet of onjuist geregistreerd staan bij het kadaster zijn niet verhaalbaar op Ground Research BV.',
+    'Aansprakelijkheid is te allen tijde gemaximeerd tot het bedrag van de opdracht.',
+    'Werkzaamheden worden uitgevoerd onder BRL2000 / BRL2100 / BRL11000 certificaat.',
+    'Scheidende lagen worden afgedicht volgens de richtlijnen van BRL2100.',
+    'Onafhankelijkheid moet ten allen tijde zijn geborgd. Ground Research keurt geen eigen grond (zie BRL2000, BRL2100 of BRL11000, functiescheiding).',
+    'De projectleider van Ground Research beoordeelt alleen of de aangeleverde gegevens voldoende zijn om de werkzaamheden conform de BRL-eisen uit te voeren.',
+    'Garantie op ondergronds systeem 10 jaar. Prestatiegarantie op bodemwisselaar 25 jaar.',
+    'Voor klachten t.o.v. BRL-werkzaamheden kunt u terecht bij Ground Research BV.'
+  ];
+  let vCounter = 1;
+  voorwaarden.forEach(v => {
+    if (y > 245) { addFooter(); doc.addPage(); y = addHeader('ALGEMENE VOORWAARDEN & FACTURERING', false); }
+    const vlines = doc.splitTextToSize(`${vCounter}. ${v}`, PW - 4);
+    doc.text(vlines, M + 2, y);
+    y += vlines.length * 4 + 2;
+    vCounter++;
+  });
+
+  y += 10;
+  if (y > 235) { addFooter(); doc.addPage(); y = addHeader('ALGEMENE VOORWAARDEN & FACTURERING', false); }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...MEDIUM_BLUE);
+  doc.text('Facturering', M, y);
+  doc.setTextColor(0, 0, 0);
+  y += 8;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text('De kosten zullen volgens onderstaand schema worden verrekend:', M, y);
+  y += 7;
+  doc.text('\u2022  50% van de totale kosten na ontvangst van de opdrachtbevestiging', M + 4, y);
+  y += 6;
+  doc.text('\u2022  50% na oplevering werk', M + 4, y);
+  y += 10;
+  doc.text('Het factuurbedrag dient binnen 30 dagen op onze bankrekening te zijn overgemaakt.', M, y);
+  y += 6;
+  doc.text('Alle vermelde bedragen zijn exclusief BTW.', M, y);
+  y += 6;
+  doc.text('Dit voorstel geldt tot drie maanden na dato.', M, y);
+
+  addFooter();
+
   const filename = `Offerte_${d.kenmerk || 'draft'}_${d.klantNaam || 'klant'}.pdf`.replace(/\s+/g, '_');
   doc.save(filename);
   const offerteProject = ((d.kenmerk || '') + (d.locatie ? '-' + d.locatie : '')).trim() || 'draft';
