@@ -67,6 +67,11 @@ export default function Page() {
     jspdfScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
     jspdfScript.async = false;
     jspdfScript.onload = () => {
+      // Load jspdf-autotable for table support in werkbon PDF
+      const autoTableScript = document.createElement('script');
+      autoTableScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+      autoTableScript.async = false;
+      autoTableScript.onload = () => {
       // Load PDF.js for rendering PDF boortekeningen
       const pdfjsScript = document.createElement('script');
       pdfjsScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
@@ -80,6 +85,8 @@ export default function Page() {
         document.body.appendChild(script);
       };
       document.body.appendChild(pdfjsScript);
+      };
+      document.body.appendChild(autoTableScript);
     };
     document.body.appendChild(jspdfScript);
 

@@ -3522,6 +3522,12 @@ function initWerkbonTab() {
   if (wbTabInited) return;
   wbTabInited = true;
   document.getElementById('wb-datum').value = new Date().toISOString().split('T')[0];
+  // Attach recalc listener
+  var el = document.getElementById('wb-offertebedrag');
+  if (el) {
+    el.addEventListener('input', wbRecalc);
+    el.addEventListener('change', wbRecalc);
+  }
 }
 
 function werkbonFromOfferte() {
@@ -3679,11 +3685,7 @@ function wbRecalc() {
   document.getElementById('wb-totaal-incl').textContent = eur(totaal + btw);
 }
 
-// Attach recalc on offertebedrag change
-document.addEventListener('DOMContentLoaded', function() {
-  var el = document.getElementById('wb-offertebedrag');
-  if (el) el.addEventListener('input', wbRecalc);
-});
+// recalc listener wordt nu gekoppeld in initWerkbonTab
 
 async function generateWerkbonPDF() {
   var v = function(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; };
