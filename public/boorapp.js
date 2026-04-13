@@ -3509,34 +3509,56 @@ function generateOpleverPDF() {
   uploadToDropbox(pdf, filename, p.klant || '', oplProject, 'Opleverrapport');
 }
 
-
-
-
 // ============================================================
-// WERKBON
+// WERKBON / PRE-FACTUUR
 // ============================================================
 var wbBoringen = [];
 var wbBoringCounter = 0;
-var wbMateriaal = [];
-var wbMateriaalCounter = 0;
+var wbMeerwerk = [];
+var wbMeerwerkCounter = 0;
 var wbTabInited = false;
 
 function initWerkbonTab() {
   if (wbTabInited) return;
   wbTabInited = true;
-  wbAddBoring();
-  wbAddMateriaal();
+  document.getElementById('wb-datum').value = new Date().toISOString().split('T')[0];
 }
 
 function werkbonFromOfferte() {
   var v = function(id) { var el = document.getElementById(id); return el ? el.value : ''; };
   document.getElementById('wb-kenmerk').value = v('f-kenmerk');
-  document.getElementById('wb-klant').value = v('f-klant') !== '__new__' ?
-    (document.getElementById('f-klant').selectedOptions[0]?.textContent || '') : '';
+  var klantSel = document.getElementById('f-klant');
+  var klantNaam = '';
+  var klantAdres = '';
+  if (klantSel && klantSel.value && klantSel.value !== '__new__') {
+    klantNaam = klantSel.selectedOptions[0]?.textContent || '';
+    // Try to get address from klanten list
+    try {
+      var klanten = getKlanten();
+      var k = klanten.find(function(x) { return x.id == klantSel.value; });
+      if (k) klantAdres = k.adres || '';
+    } catch(e) {}
+  }
+  document.getElementById('wb-klant').value = klantNaam;
   document.getElementById('wb-contact').value = v('f-tav');
+  document.getElementById('wb-adres').value = klantAdres;
   document.getElementById('wb-locatie').value = v('f-locatie');
   document.getElementById('wb-betreft').value = v('f-betreft');
   document.getElementById('wb-datum').value = new Date().toISOString().split('T')[0];
+
+  // Offertebedrag overnemen
+  try {
+    var total = 0;
+    var costEls = document.querySelectorAll('.cost-value');
+    // Probeer het totaal uit de calc samen te stellen
+    var data = gatherOfferteData();
+    total = data.total || 0;
+    document.getElementById('wb-offertebedrag').value = eur(total);
+  } catch(e) {
+    document.getElementById('wb-offertebedrag').value = '';
+  }
+
+  // Boringen overnemen uit clusters
   wbBoringen = [];
   wbBoringCounter = 0;
   document.getElementById('wb-boringen-list').innerHTML = '';
@@ -3547,71 +3569,107 @@ function werkbonFromOfferte() {
         wbAddBoring(parseFloat(c.diepte) || 0);
       }
     });
-  } else {
-    wbAddBoring();
   }
+  // Reset meerwerk
+  wbMeerwerk = [];
+  wbMeerwerkCounter = 0;
+  document.getElementById('wb-meerwerk-list').innerHTML = '';
+
+  wbRecalc();
 }
 
 function wbAddBoring(diepte) {
   wbBoringCounter++;
   var id = wbBoringCounter;
-  wbBoringen.push({ id: id, diepte: diepte || 0, omschrijving: '' });
+  wbBoringen.push({ id: id, diepte: diepte || 0 });
   var list = document.getElementById('wb-boringen-list');
   var row = document.createElement('div');
   row.id = 'wb-boring-' + id;
-  row.className = 'form-row';
-  row.style.cssText = 'align-items:center; margin-bottom:6px;';
+  row.style.cssText = 'display:flex; align-items:center; gap:8px; margin-bottom:4px;';
   row.innerHTML =
     '<span style="font-size:12px; font-weight:600; min-width:30px; color:#5a9138;">B' + id + '</span>' +
-    '<div class="form-group" style="flex:1; margin:0;"><input type="number" step="0.1" placeholder="Diepte (m)" value="' + (diepte || '') + '" onchange="wbUpdateBoring(' + id + ',this.value)" style="padding:6px 8px; font-size:13px;"></div>' +
-    '<div class="form-group" style="flex:2; margin:0;"><input type="text" placeholder="Bijzonderheden" onchange="wbUpdateBoringOms(' + id + ',this.value)" style="padding:6px 8px; font-size:13px;"></div>' +
+    '<input type="number" step="0.1" placeholder="Diepte (m)" value="' + (diepte || '') + '" onchange="wbUpdateBoring(' + id + ',this.value)" style="flex:1; padding:6px 8px; font-size:13px; border:1px solid #d0d5dd; border-radius:4px;">' +
     '<button class="btn btn-danger btn-sm" onclick="wbRemoveBoring(' + id + ')" style="padding:4px 8px; font-size:11px;">\u2715</button>';
   list.appendChild(row);
+  wbUpdateBoringenTotaal();
 }
 
 function wbUpdateBoring(id, val) {
   var b = wbBoringen.find(function(x) { return x.id === id; });
   if (b) b.diepte = parseFloat(val) || 0;
-}
-function wbUpdateBoringOms(id, val) {
-  var b = wbBoringen.find(function(x) { return x.id === id; });
-  if (b) b.omschrijving = val;
+  wbUpdateBoringenTotaal();
 }
 function wbRemoveBoring(id) {
   wbBoringen = wbBoringen.filter(function(x) { return x.id !== id; });
   var el = document.getElementById('wb-boring-' + id);
   if (el) el.remove();
+  wbUpdateBoringenTotaal();
+}
+function wbUpdateBoringenTotaal() {
+  var total = wbBoringen.reduce(function(s, b) { return s + (b.diepte || 0); }, 0);
+  var el = document.getElementById('wb-boringen-totaal');
+  if (el) el.textContent = wbBoringen.length + ' boring' + (wbBoringen.length !== 1 ? 'en' : '') + ', ' + total.toFixed(1) + ' m';
 }
 
-function wbAddMateriaal(naam, hoeveelheid, eenheid) {
-  wbMateriaalCounter++;
-  var id = wbMateriaalCounter;
-  wbMateriaal.push({ id: id, naam: naam || '', hoeveelheid: hoeveelheid || 0, eenheid: eenheid || '' });
-  var list = document.getElementById('wb-materiaal-list');
+function wbAddMeerwerk(type) {
+  wbMeerwerkCounter++;
+  var id = wbMeerwerkCounter;
+  var isMeer = type === 'meer';
+  wbMeerwerk.push({ id: id, type: type, omschrijving: '', bedrag: 0 });
+  var list = document.getElementById('wb-meerwerk-list');
   var row = document.createElement('div');
-  row.id = 'wb-mat-' + id;
-  row.className = 'form-row';
-  row.style.cssText = 'align-items:center; margin-bottom:6px;';
+  row.id = 'wb-mw-' + id;
+  row.style.cssText = 'display:flex; align-items:center; gap:8px; margin-bottom:6px;';
+  var color = isMeer ? '#5a9138' : '#c0392b';
+  var prefix = isMeer ? '+' : '-';
   row.innerHTML =
-    '<div class="form-group" style="flex:2; margin:0;"><input type="text" placeholder="Materiaal" value="' + (naam || '') + '" onchange="wbUpdateMat(' + id + ',\'naam\',this.value)" style="padding:6px 8px; font-size:13px;"></div>' +
-    '<div class="form-group" style="flex:1; margin:0;"><input type="number" step="0.1" placeholder="Aantal" value="' + (hoeveelheid || '') + '" onchange="wbUpdateMat(' + id + ',\'hoeveelheid\',this.value)" style="padding:6px 8px; font-size:13px;"></div>' +
-    '<div class="form-group" style="flex:1; margin:0;"><input type="text" placeholder="Eenheid" value="' + (eenheid || '') + '" onchange="wbUpdateMat(' + id + ',\'eenheid\',this.value)" style="padding:6px 8px; font-size:13px;"></div>' +
-    '<button class="btn btn-danger btn-sm" onclick="wbRemoveMat(' + id + ')" style="padding:4px 8px; font-size:11px;">\u2715</button>';
+    '<span style="font-size:14px; font-weight:700; color:' + color + '; min-width:20px;">' + prefix + '</span>' +
+    '<input type="text" placeholder="Omschrijving" onchange="wbUpdateMW(' + id + ',\'omschrijving\',this.value)" style="flex:2; padding:6px 8px; font-size:13px; border:1px solid #d0d5dd; border-radius:4px;">' +
+    '<input type="number" step="0.01" placeholder="\u20ac Bedrag" onchange="wbUpdateMW(' + id + ',\'bedrag\',this.value);wbRecalc()" style="flex:1; padding:6px 8px; font-size:13px; border:1px solid #d0d5dd; border-radius:4px;">' +
+    '<button class="btn btn-danger btn-sm" onclick="wbRemoveMW(' + id + ')" style="padding:4px 8px; font-size:11px;">\u2715</button>';
   list.appendChild(row);
 }
 
-function wbUpdateMat(id, field, val) {
-  var m = wbMateriaal.find(function(x) { return x.id === id; });
+function wbUpdateMW(id, field, val) {
+  var m = wbMeerwerk.find(function(x) { return x.id === id; });
   if (m) {
-    if (field === 'hoeveelheid') m[field] = parseFloat(val) || 0;
+    if (field === 'bedrag') m[field] = parseFloat(val) || 0;
     else m[field] = val;
   }
+  if (field === 'bedrag') wbRecalc();
 }
-function wbRemoveMat(id) {
-  wbMateriaal = wbMateriaal.filter(function(x) { return x.id !== id; });
-  var el = document.getElementById('wb-mat-' + id);
+function wbRemoveMW(id) {
+  wbMeerwerk = wbMeerwerk.filter(function(x) { return x.id !== id; });
+  var el = document.getElementById('wb-mw-' + id);
   if (el) el.remove();
+  wbRecalc();
 }
+
+function wbParseAmount(str) {
+  if (typeof str === 'number') return str;
+  if (!str) return 0;
+  return parseFloat(String(str).replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
+}
+
+function wbRecalc() {
+  var basis = wbParseAmount(document.getElementById('wb-offertebedrag').value);
+  var delta = 0;
+  wbMeerwerk.forEach(function(m) {
+    if (m.type === 'meer') delta += (m.bedrag || 0);
+    else delta -= (m.bedrag || 0);
+  });
+  var totaal = basis + delta;
+  var btw = totaal * 0.21;
+  document.getElementById('wb-totaal').textContent = eur(totaal);
+  document.getElementById('wb-btw').textContent = eur(btw);
+  document.getElementById('wb-totaal-incl').textContent = eur(totaal + btw);
+}
+
+// Attach recalc on offertebedrag change
+document.addEventListener('DOMContentLoaded', function() {
+  var el = document.getElementById('wb-offertebedrag');
+  if (el) el.addEventListener('input', wbRecalc);
+});
 
 async function generateWerkbonPDF() {
   var v = function(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; };
@@ -3619,16 +3677,13 @@ async function generateWerkbonPDF() {
   var datum = v('wb-datum') || new Date().toISOString().split('T')[0];
   var klant = v('wb-klant') || '-';
   var contact = v('wb-contact');
+  var adres = v('wb-adres');
   var locatie = v('wb-locatie') || '-';
   var betreft = v('wb-betreft') || '-';
-  var starttijd = v('wb-starttijd') || '';
-  var eindtijd = v('wb-eindtijd') || '';
-  var personeel = v('wb-personeel') || '-';
-  var materieel = v('wb-materieel') || '-';
   var opmerkingen = v('wb-opmerkingen') || '';
 
   var boringen = wbBoringen.filter(function(b) { return b.diepte > 0; });
-  var materialen = wbMateriaal.filter(function(m) { return (m.naam || '').trim(); });
+  var basis = wbParseAmount(v('wb-offertebedrag'));
 
   var jsPDF = window.jspdf.jsPDF;
   var doc = new jsPDF('p', 'mm', 'a4');
@@ -3645,8 +3700,9 @@ async function generateWerkbonPDF() {
   doc.text('Ground Research BV', W - M, 14, { align: 'right' });
   doc.text('Vrijheidweg 45, 1521 RP Wormerveer', W - M, 19, { align: 'right' });
   doc.text('Tel: 075-7113976', W - M, 24, { align: 'right' });
+  doc.text('KvK: 37089931 | BTW: NL808849840B01', W - M, 29, { align: 'right' });
 
-  y = 34;
+  y = 36;
   doc.setDrawColor(90, 145, 56);
   doc.setLineWidth(0.8);
   doc.line(M, y, W - M, y);
@@ -3654,75 +3710,95 @@ async function generateWerkbonPDF() {
 
   // Titel
   doc.setFontSize(18); doc.setTextColor(90, 145, 56); doc.setFont(undefined, 'bold');
-  doc.text('WERKBON', M, y + 8);
+  doc.text('WERKBON / PRE-FACTUUR', M, y + 8);
   doc.setFontSize(11); doc.setTextColor(60);
   doc.text(kenmerk, W - M, y + 8, { align: 'right' });
-  y += 16;
+  y += 18;
 
-  // Projectgegevens
-  doc.setFontSize(12); doc.setTextColor(90, 145, 56); doc.setFont(undefined, 'bold');
-  doc.text('Projectgegevens', M, y); y += 6;
-  doc.setFontSize(10); doc.setTextColor(50); doc.setFont(undefined, 'normal');
+  // Klantgegevens links, projectinfo rechts
+  doc.setFontSize(10); doc.setTextColor(50);
+  doc.setFont(undefined, 'bold'); doc.text('Opdrachtgever:', M, y);
+  doc.setFont(undefined, 'normal');
+  y += 5;
+  doc.text(klant, M, y); y += 4;
+  if (contact) { doc.text('T.a.v. ' + contact, M, y); y += 4; }
+  if (adres) { doc.text(adres, M, y); y += 4; }
+  y += 2;
 
-  var fields = [
-    ['Opdrachtgever', klant],
-    ['Contactpersoon', contact],
-    ['Locatie', locatie],
-    ['Betreft', betreft],
+  // Projectinfo
+  var infoY = y;
+  var infoFields = [
+    ['Projectnummer', kenmerk],
     ['Datum', datum],
-    ['Starttijd', starttijd],
-    ['Eindtijd', eindtijd],
-    ['Personeel', personeel],
-    ['Materieel', materieel]
+    ['Locatie', locatie],
+    ['Betreft', betreft]
   ];
-  fields.forEach(function(f) {
-    if (!f[1]) return;
+  infoFields.forEach(function(f) {
     doc.setFont(undefined, 'bold'); doc.text(f[0] + ':', M, y);
     doc.setFont(undefined, 'normal'); doc.text(String(f[1]), M + 40, y);
     y += 5;
   });
-  y += 4;
+  y += 6;
 
   // Boringen tabel
   if (boringen.length) {
     doc.setFontSize(12); doc.setTextColor(90, 145, 56); doc.setFont(undefined, 'bold');
-    doc.text('Boringen', M, y); y += 2;
+    doc.text('Uitgevoerde boringen', M, y); y += 2;
 
     doc.autoTable({
       startY: y,
       margin: { left: M, right: M },
-      head: [['#', 'Diepte (m)', 'Bijzonderheden']],
+      head: [['#', 'Diepte (m)']],
       body: boringen.map(function(b, i) {
-        return ['B' + (i + 1), b.diepte.toFixed(1), b.omschrijving || ''];
+        return ['B' + (i + 1), b.diepte.toFixed(1)];
       }),
       styles: { fontSize: 9, cellPadding: 2.5 },
       headStyles: { fillColor: [90, 145, 56], textColor: 255, fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [245, 248, 242] },
-      foot: [['Totaal', boringen.reduce(function(s, b) { return s + b.diepte; }, 0).toFixed(1) + ' m', boringen.length + ' boring' + (boringen.length > 1 ? 'en' : '')]],
-      footStyles: { fillColor: [232, 245, 225], fontStyle: 'bold', textColor: [50, 50, 50] }
+      foot: [['Totaal: ' + boringen.length + ' boring' + (boringen.length > 1 ? 'en' : ''), boringen.reduce(function(s, b) { return s + b.diepte; }, 0).toFixed(1) + ' m']],
+      footStyles: { fillColor: [232, 245, 225], fontStyle: 'bold', textColor: [50, 50, 50] },
+      columnStyles: { 0: { cellWidth: 30 } }
     });
     y = doc.lastAutoTable.finalY + 8;
   }
 
-  // Materiaalverbruik tabel
-  if (materialen.length) {
-    if (y > 240) { doc.addPage(); y = 20; }
-    doc.setFontSize(12); doc.setTextColor(90, 145, 56); doc.setFont(undefined, 'bold');
-    doc.text('Materiaalverbruik', M, y); y += 2;
+  // Facturatie tabel
+  doc.setFontSize(12); doc.setTextColor(90, 145, 56); doc.setFont(undefined, 'bold');
+  doc.text('Facturatie', M, y); y += 2;
 
-    doc.autoTable({
-      startY: y,
-      margin: { left: M, right: M },
-      head: [['Materiaal', 'Hoeveelheid', 'Eenheid']],
-      body: materialen.map(function(m) {
-        return [m.naam, m.hoeveelheid || '', m.eenheid || ''];
-      }),
-      styles: { fontSize: 9, cellPadding: 2.5 },
-      headStyles: { fillColor: [90, 145, 56], textColor: 255, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [245, 248, 242] }
-    });
-    y = doc.lastAutoTable.finalY + 8;
-  }
+  var factRows = [['Offertebedrag', eur(basis)]];
+  var totaal = basis;
+  wbMeerwerk.forEach(function(m) {
+    if (!m.omschrijving && !m.bedrag) return;
+    var bedrag = m.bedrag || 0;
+    if (m.type === 'meer') {
+      factRows.push(['Meerwerk: ' + (m.omschrijving || ''), '+ ' + eur(bedrag)]);
+      totaal += bedrag;
+    } else {
+      factRows.push(['Minderwerk: ' + (m.omschrijving || ''), '- ' + eur(bedrag)]);
+      totaal -= bedrag;
+    }
+  });
+
+  var btw = totaal * 0.21;
+
+  doc.autoTable({
+    startY: y,
+    margin: { left: M, right: M },
+    head: [['Omschrijving', 'Bedrag']],
+    body: factRows,
+    foot: [
+      ['Subtotaal (excl. BTW)', eur(totaal)],
+      ['BTW 21%', eur(btw)],
+      ['Totaal (incl. BTW)', eur(totaal + btw)]
+    ],
+    styles: { fontSize: 10, cellPadding: 3 },
+    headStyles: { fillColor: [90, 145, 56], textColor: 255, fontStyle: 'bold' },
+    footStyles: { fillColor: [232, 245, 225], fontStyle: 'bold', textColor: [50, 50, 50], fontSize: 11 },
+    columnStyles: { 1: { halign: 'right', cellWidth: 50 } },
+    alternateRowStyles: { fillColor: [250, 252, 248] }
+  });
+  y = doc.lastAutoTable.finalY + 8;
 
   // Opmerkingen
   if (opmerkingen) {
@@ -3732,7 +3808,6 @@ async function generateWerkbonPDF() {
     doc.setFontSize(10); doc.setTextColor(50); doc.setFont(undefined, 'normal');
     var splitOpm = doc.splitTextToSize(opmerkingen, contentW);
     doc.text(splitOpm, M, y);
-    y += splitOpm.length * 5 + 4;
   }
 
   // Footer

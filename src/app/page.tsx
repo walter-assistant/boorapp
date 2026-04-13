@@ -1220,7 +1220,7 @@ const BOORAPP_HTML = `
     </div>
   </div>
 
-  <!-- TAB: WERKBON -->
+  <!-- TAB: WERKBON / PRE-FACTUUR -->
   <div id="tab-werkbon" class="tab-content">
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
 
@@ -1230,52 +1230,71 @@ const BOORAPP_HTML = `
           <h2>Projectgegevens</h2>
           <button class="btn btn-primary" onclick="werkbonFromOfferte()" style="margin-bottom:12px; font-size:12px; padding:6px 14px;">📋 Overnemen uit offerte</button>
           <div class="form-row">
-            <div class="form-group"><label>Kenmerk</label><input type="text" id="wb-kenmerk" placeholder="GR123-2026-001"></div>
-            <div class="form-group"><label>Datum werkzaamheden</label><input type="date" id="wb-datum"></div>
+            <div class="form-group"><label>Projectnummer</label><input type="text" id="wb-kenmerk" placeholder="GR123-2026-001"></div>
+            <div class="form-group"><label>Factuurdatum</label><input type="date" id="wb-datum"></div>
           </div>
           <div class="form-row">
             <div class="form-group"><label>Opdrachtgever</label><input type="text" id="wb-klant" placeholder="Klantnaam"></div>
-            <div class="form-group"><label>Contactpersoon</label><input type="text" id="wb-contact" placeholder="T.a.v."></div>
+            <div class="form-group"><label>T.a.v.</label><input type="text" id="wb-contact" placeholder="Contactpersoon"></div>
           </div>
           <div class="form-row full">
-            <div class="form-group"><label>Locatie</label><input type="text" id="wb-locatie" placeholder="Adres boorlocatie"></div>
+            <div class="form-group"><label>Adres</label><input type="text" id="wb-adres" placeholder="Adres opdrachtgever"></div>
           </div>
-          <div class="form-row">
+          <div class="form-row full">
+            <div class="form-group"><label>Locatie werkzaamheden</label><input type="text" id="wb-locatie" placeholder="Adres boorlocatie"></div>
+          </div>
+          <div class="form-row full">
             <div class="form-group"><label>Betreft</label><input type="text" id="wb-betreft" placeholder="Omschrijving werkzaamheden"></div>
           </div>
         </div>
 
         <div class="panel">
-          <h2>Materiaalverbruik</h2>
-          <div id="wb-materiaal-list"></div>
-          <button class="btn btn-outline" onclick="wbAddMateriaal()" style="margin-top:8px; font-size:12px;">+ Materiaal toevoegen</button>
+          <h2>Boringen</h2>
+          <div id="wb-boringen-list"></div>
+          <div style="margin-top:8px; padding:8px 12px; background:#e8f5e1; border-radius:6px; font-size:13px;">
+            <strong>Totaal:</strong> <span id="wb-boringen-totaal">0 boringen, 0 m</span>
+          </div>
         </div>
       </div>
 
       <!-- RECHTER KOLOM -->
       <div>
         <div class="panel">
-          <h2>Uitvoering</h2>
+          <h2>Facturatie</h2>
           <div class="form-row">
-            <div class="form-group"><label>Starttijd</label><input type="time" id="wb-starttijd" value="07:00"></div>
-            <div class="form-group"><label>Eindtijd</label><input type="time" id="wb-eindtijd" value="17:00"></div>
+            <div class="form-group"><label>Offertebedrag (excl. BTW)</label><input type="text" id="wb-offertebedrag" placeholder="€ 0,00" style="font-size:16px; font-weight:600;"></div>
           </div>
-          <div class="form-row">
-            <div class="form-group"><label>Personeel</label><input type="text" id="wb-personeel" placeholder="Namen medewerkers"></div>
-            <div class="form-group"><label>Materieel</label><input type="text" id="wb-materieel" placeholder="Machine / voertuig"></div>
+
+          <h3 style="margin-top:16px; margin-bottom:8px; font-size:14px;">Meerwerk / Minderwerk</h3>
+          <div id="wb-meerwerk-list"></div>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="btn btn-outline" onclick="wbAddMeerwerk('meer')" style="font-size:12px; color:#5a9138;">+ Meerwerk</button>
+            <button class="btn btn-outline" onclick="wbAddMeerwerk('minder')" style="font-size:12px; color:#c0392b;">- Minderwerk</button>
           </div>
-          <h3 style="margin-top:16px; margin-bottom:8px; font-size:14px;">Boringen</h3>
-          <div id="wb-boringen-list"></div>
-          <button class="btn btn-outline" onclick="wbAddBoring()" style="margin-top:8px; font-size:12px;">+ Boring toevoegen</button>
+
+          <div style="margin-top:16px; padding:12px; background:#f0f7ec; border-radius:8px; border:2px solid #5a9138;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:14px; font-weight:600; color:#333;">Totaal factuurbedrag (excl. BTW)</span>
+              <span id="wb-totaal" style="font-size:20px; font-weight:700; color:#5a9138;">€ 0,00</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+              <span style="font-size:12px; color:#666;">BTW 21%</span>
+              <span id="wb-btw" style="font-size:13px; color:#666;">€ 0,00</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; padding-top:6px; border-top:1px solid #c5d9b8;">
+              <span style="font-size:14px; font-weight:600; color:#333;">Totaal incl. BTW</span>
+              <span id="wb-totaal-incl" style="font-size:18px; font-weight:700; color:#333;">€ 0,00</span>
+            </div>
+          </div>
         </div>
 
         <div class="panel">
           <h2>Opmerkingen</h2>
-          <textarea id="wb-opmerkingen" rows="4" style="width:100%; border:1px solid #d0d5dd; border-radius:6px; padding:8px; font-size:13px; resize:vertical;" placeholder="Bijzonderheden, afwijkingen, etc."></textarea>
+          <textarea id="wb-opmerkingen" rows="3" style="width:100%; border:1px solid #d0d5dd; border-radius:6px; padding:8px; font-size:13px; resize:vertical;" placeholder="Bijzonderheden, afwijkingen, etc."></textarea>
         </div>
 
         <div class="btn-group">
-          <button class="btn btn-success" onclick="generateWerkbonPDF()">📄 Werkbon PDF</button>
+          <button class="btn btn-success" onclick="generateWerkbonPDF()">📄 Werkbon / Pre-factuur PDF</button>
         </div>
       </div>
 
