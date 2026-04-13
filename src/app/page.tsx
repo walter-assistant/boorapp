@@ -301,6 +301,7 @@ const BOORAPP_HTML = `
   <div class="tab" onclick="switchTab('opgeslagen')">Opgeslagen Offertes</div>
   <div class="tab" onclick="switchTab('pva')">Plan van Aanpak</div>
   <div class="tab" onclick="switchTab('oplever')">Opleverrapport</div>
+  <div class="tab" onclick="switchTab('werkbon')">Werkbon</div>
 </div>
 
 <div class="container">
@@ -1216,6 +1217,68 @@ const BOORAPP_HTML = `
           <button class="btn btn-primary" onclick="copyOfferteToOplever()">📋 Overnemen uit offerte</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- TAB: WERKBON -->
+  <div id="tab-werkbon" class="tab-content">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+
+      <!-- LINKER KOLOM -->
+      <div>
+        <div class="panel">
+          <h2>Projectgegevens</h2>
+          <button class="btn btn-primary" onclick="werkbonFromOfferte()" style="margin-bottom:12px; font-size:12px; padding:6px 14px;">📋 Overnemen uit offerte</button>
+          <div class="form-row">
+            <div class="form-group"><label>Kenmerk</label><input type="text" id="wb-kenmerk" placeholder="GR123-2026-001"></div>
+            <div class="form-group"><label>Datum werkzaamheden</label><input type="date" id="wb-datum"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Opdrachtgever</label><input type="text" id="wb-klant" placeholder="Klantnaam"></div>
+            <div class="form-group"><label>Contactpersoon</label><input type="text" id="wb-contact" placeholder="T.a.v."></div>
+          </div>
+          <div class="form-row full">
+            <div class="form-group"><label>Locatie</label><input type="text" id="wb-locatie" placeholder="Adres boorlocatie"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Betreft</label><input type="text" id="wb-betreft" placeholder="Omschrijving werkzaamheden"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Materiaalverbruik</h2>
+          <div id="wb-materiaal-list"></div>
+          <button class="btn btn-outline" onclick="wbAddMateriaal()" style="margin-top:8px; font-size:12px;">+ Materiaal toevoegen</button>
+        </div>
+      </div>
+
+      <!-- RECHTER KOLOM -->
+      <div>
+        <div class="panel">
+          <h2>Uitvoering</h2>
+          <div class="form-row">
+            <div class="form-group"><label>Starttijd</label><input type="time" id="wb-starttijd" value="07:00"></div>
+            <div class="form-group"><label>Eindtijd</label><input type="time" id="wb-eindtijd" value="17:00"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Personeel</label><input type="text" id="wb-personeel" placeholder="Namen medewerkers"></div>
+            <div class="form-group"><label>Materieel</label><input type="text" id="wb-materieel" placeholder="Machine / voertuig"></div>
+          </div>
+          <h3 style="margin-top:16px; margin-bottom:8px; font-size:14px;">Boringen</h3>
+          <div id="wb-boringen-list"></div>
+          <button class="btn btn-outline" onclick="wbAddBoring()" style="margin-top:8px; font-size:12px;">+ Boring toevoegen</button>
+        </div>
+
+        <div class="panel">
+          <h2>Opmerkingen</h2>
+          <textarea id="wb-opmerkingen" rows="4" style="width:100%; border:1px solid #d0d5dd; border-radius:6px; padding:8px; font-size:13px; resize:vertical;" placeholder="Bijzonderheden, afwijkingen, etc."></textarea>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn-success" onclick="generateWerkbonPDF()">📄 Werkbon PDF</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
