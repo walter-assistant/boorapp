@@ -129,9 +129,20 @@ function getKlanten() {
   }
   return JSON.parse(k);
 }
-function saveKlanten(arr) { localStorage.setItem('gr_klanten', JSON.stringify(arr)); }
+function saveKlanten(arr) {
+  localStorage.setItem('gr_klanten', JSON.stringify(arr));
+  if (window.__supabaseSave) {
+    try { window.__supabaseSave('gr_klanten', arr); } catch(e) {}
+  }
+}
 function getOffertes() { return JSON.parse(localStorage.getItem('gr_offertes') || '[]'); }
-function saveOffertes(arr) { localStorage.setItem('gr_offertes', JSON.stringify(arr)); }
+function saveOffertes(arr) {
+  localStorage.setItem('gr_offertes', JSON.stringify(arr));
+  // Sync naar Supabase zodat deletes ook in de cloud staan
+  if (window.__supabaseSave) {
+    try { window.__supabaseSave('gr_offertes', arr); } catch(e) {}
+  }
+}
 
 // ============================================================
 // FORMATTING
