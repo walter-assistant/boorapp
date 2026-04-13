@@ -1372,10 +1372,10 @@ function gatherOfferteData() {
 // ============================================================
 function generateProjectNummer() {
   const year = new Date().getFullYear();
-  const prefix = 'GR-' + year + '-';
+  const prefix = 'GR123-' + year + '-';
   const offertes = getOffertes();
   let max = 0;
-  const re = new RegExp('GR-' + year + '-(\\d{3,})', 'i');
+  const re = new RegExp('GR123-' + year + '-(\\d{3,})', 'i');
   offertes.forEach(function(o) {
     var m = String(o.kenmerk || '').match(re);
     if (m) { var n = parseInt(m[1], 10); if (n > max) max = n; }
