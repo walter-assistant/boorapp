@@ -3648,7 +3648,21 @@ function wbRemoveMW(id) {
 function wbParseAmount(str) {
   if (typeof str === 'number') return str;
   if (!str) return 0;
-  return parseFloat(String(str).replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
+  // NL format: 9.146,60 → verwijder punten (duizendtallen), komma → punt (decimaal)
+  var s = String(str).replace(/[^\d.,-]/g, '');
+  // Als er zowel punt als komma in zit: punt = duizendtallen, komma = decimaal
+  if (s.indexOf(',') > -1 && s.indexOf('.') > -1) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (s.indexOf(',') > -1) {
+    // Alleen komma: kan decimaal zijn (9146,60) of duizendtallen (9,146)
+    var parts = s.split(',');
+    if (parts[1] && parts[1].length === 3 && parts.length === 2 && !parts[0].match(/^\d{1,3}$/)) {
+      s = s.replace(',', ''); // duizendtallen
+    } else {
+      s = s.replace(',', '.'); // decimaal
+    }
+  }
+  return parseFloat(s) || 0;
 }
 
 function wbRecalc() {
