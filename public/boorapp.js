@@ -1442,29 +1442,40 @@ function saveOfferte(silent) {
 function renderOffertes() {
   const list = document.getElementById('offertes-list');
   const offertes = getOffertes();
-  if (!offertes.length) {
-    list.innerHTML = '<div class="empty-state"><p>Nog geen opgeslagen offertes</p></div>';
+  const showArchived = document.getElementById('toonArchief')?.checked || false;
+  const visible = offertes.map((o, idx) => ({ o, idx })).filter(x => showArchived ? true : !x.o.archived);
+  if (!visible.length) {
+    list.innerHTML = '<div class="empty-state"><p>' + (showArchived ? 'Geen offertes (ook niet in archief)' : 'Geen actieve offertes') + '</p></div>';
     return;
   }
   list.innerHTML = '';
-  offertes.forEach((o, idx) => {
+  visible.forEach(({ o, idx }) => {
     const norm = normalizeOfferteData(o);
     const meters = (norm.clusters || []).reduce((sum, c) => sum + ((parseFloat(c.diepte) || 0) * (parseInt(c.boringen, 10) || 0)), 0);
     const card = document.createElement('div');
     card.className = 'offerte-card';
+    if (o.archived) card.style.cssText = 'opacity:0.5; border-left:3px solid #999;';
     const d = o.datum || o.savedAt?.substring(0, 10) || '';
+    const archiefLabel = o.archived ? '<span style="background:#999;color:#fff;padding:1px 6px;border-radius:4px;font-size:10px;margin-left:6px;">Archief</span>' : '';
+    var buttons = '';
+    if (o.archived) {
+      buttons = `
+        <button class="btn btn-primary btn-sm" onclick="restoreOfferte(${idx})">\u21a9\ufe0f Terugzetten</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteOfferte(${idx})">🗑\ufe0f Definitief wissen</button>`;
+    } else {
+      buttons = `
+        <button class="btn btn-primary btn-sm" onclick="loadOfferte(${idx})">📂 Open</button>
+        <button class="btn btn-success btn-sm" onclick="pdfFromSaved(${idx})">📄 PDF</button>
+        <button class="btn btn-outline btn-sm" onclick="archiveOfferte(${idx})" style="color:#999;border-color:#ccc;">📦 Archiveren</button>`;
+    }
     card.innerHTML = `
       <div class="offerte-info">
-        <h3>${o.kenmerk || 'Geen kenmerk'} — ${o.klantNaam || 'Onbekend'}</h3>
-        <p>${d} · ${o.betreft || ''} · ${meters || 0}m · ${norm.clusters.length} cluster(s)</p>
+        <h3>${o.kenmerk || 'Geen kenmerk'} \u2014 ${o.klantNaam || 'Onbekend'}${archiefLabel}</h3>
+        <p>${d} \u00b7 ${o.betreft || ''} \u00b7 ${meters || 0}m \u00b7 ${norm.clusters.length} cluster(s)</p>
       </div>
       <div style="display:flex;align-items:center;gap:12px;">
         <span class="offerte-amount">${eur(o.total)}</span>
-        <div class="offerte-actions">
-          <button class="btn btn-primary btn-sm" onclick="loadOfferte(${idx})">📂 Open</button>
-          <button class="btn btn-success btn-sm" onclick="pdfFromSaved(${idx})">📄 PDF</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteOfferte(${idx})">🗑️</button>
-        </div>
+        <div class="offerte-actions">${buttons}</div>
       </div>`;
     list.appendChild(card);
   });
@@ -1530,8 +1541,29 @@ function loadOfferte(idx) {
   switchTab('offerte');
 }
 
+function archiveOfferte(idx) {
+  if (!confirm('Offerte archiveren?')) return;
+  const offertes = getOffertes();
+  if (offertes[idx]) {
+    offertes[idx].archived = true;
+    offertes[idx].archivedAt = new Date().toISOString();
+    saveOffertes(offertes);
+    renderOffertes();
+  }
+}
+
+function restoreOfferte(idx) {
+  const offertes = getOffertes();
+  if (offertes[idx]) {
+    delete offertes[idx].archived;
+    delete offertes[idx].archivedAt;
+    saveOffertes(offertes);
+    renderOffertes();
+  }
+}
+
 function deleteOfferte(idx) {
-  if (!confirm('Offerte verwijderen?')) return;
+  if (!confirm('Offerte definitief verwijderen? Dit kan niet ongedaan worden.')) return;
   const offertes = getOffertes();
   offertes.splice(idx, 1);
   saveOffertes(offertes);

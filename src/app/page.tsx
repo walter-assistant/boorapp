@@ -485,7 +485,13 @@ const BOORAPP_HTML = `
   <!-- TAB: OPGESLAGEN OFFERTES -->
   <div id="tab-opgeslagen" class="tab-content">
     <div class="panel">
-      <h2>Opgeslagen Offertes</h2>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h2 style="margin:0;">Opgeslagen Offertes</h2>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#666; cursor:pointer;">
+          <input type="checkbox" id="toonArchief" onchange="renderOffertes()">
+          📦 Toon archief
+        </label>
+      </div>
       <div id="offertes-list"></div>
     </div>
   </div>
