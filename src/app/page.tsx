@@ -307,6 +307,10 @@ const BOORAPP_HTML = `
 
   <!-- TAB: NIEUWE OFFERTE -->
   <div id="tab-offerte" class="tab-content active">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h2 style="margin:0; font-size:18px; color:#333;">Offerte</h2>
+      <button class="btn btn-success" onclick="nieuweOfferteBA()" style="padding:8px 20px; font-size:14px;">➕ Nieuwe Offerte</button>
+    </div>
     <div class="two-col">
       <div class="panel">
         <h2>Offerte Gegevens</h2>
