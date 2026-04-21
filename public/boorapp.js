@@ -1359,7 +1359,8 @@ function gatherOfferteData() {
       diepte: parseFloat(c.diepte) || 0,
       diameter: String(c.diameter || '40'),
       luslengte: String(c.luslengte || '165'),
-      verdelerput: !!c.verdelerput
+      verdelerput: !!c.verdelerput,
+      params: (c.params && typeof c.params === 'object') ? Object.assign({}, c.params) : {}
     })),
     vrijeRegels: vrijeRegelsData,
     projectKosten: projectCosts,
@@ -1530,7 +1531,8 @@ function loadOfferte(idx) {
     diepte: parseFloat(c.diepte) || 0,
     diameter: parseInt(c.diameter, 10) || 40,
     luslengte: parseInt(c.luslengte, 10) || 165,
-    verdelerput: !!c.verdelerput
+    verdelerput: !!c.verdelerput,
+    params: (c.params && typeof c.params === 'object') ? Object.assign({}, c.params) : {}
   }));
   clusterCounter = clusters.reduce((m, c) => Math.max(m, c.id || 0), 0);
   vrijeRegels = (o.vrijeRegels || []).map((r, i) => ({ id: i + 1, naam: r.naam || '', bedrag: parseFloat(r.bedrag) || 0 }));
