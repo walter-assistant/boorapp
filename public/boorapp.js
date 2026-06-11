@@ -27,6 +27,10 @@ var DROPBOX_DOC_FOLDER_MAP = {
   'OLO melding': 'OLO',
   'Opleverrapport': 'Oplever rapportage',
   'Oplever rapportage': 'Oplever rapportage',
+  'Boorprofiel': 'Boorprofiel',
+  'Boorprofielen': 'Boorprofiel',
+  'Boorstaat': 'Boorprofiel',
+  'Boorstaten': 'Boorprofiel',
   'KLIC': 'Klic',
   'Klic': 'Klic'
 };
