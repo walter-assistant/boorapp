@@ -17,25 +17,82 @@ function addSignature(pdf, x, y, w, h) {
 // ============================================================
 // DROPBOX AUTO-SAVE
 // ============================================================
+var DROPBOX_BASE_PROJECT_PATH = '/werkmap/Offerte map';
+var DROPBOX_DOC_FOLDER_MAP = {
+  'Offerte': 'Offerte',
+  'PvA': 'Plan van aanpak',
+  'Plan van aanpak': 'Plan van aanpak',
+  'WKO_Rapport': 'WKO Tool',
+  'WKO Rapport': 'WKO Tool',
+  'OLO melding': 'OLO',
+  'Opleverrapport': 'Oplever rapportage',
+  'Oplever rapportage': 'Oplever rapportage',
+  'KLIC': 'Klic',
+  'Klic': 'Klic'
+};
+
+function cleanDropboxPart(value, fallback) {
+  return String(value || fallback || '')
+    .normalize('NFKC')
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/[. ]+$/g, '')
+    .trim()
+    .slice(0, 120) || fallback;
+}
+
+function getDropboxFieldValue(ids) {
+  for (var i = 0; i < ids.length; i++) {
+    var el = document.getElementById(ids[i]);
+    if (!el || !el.value || !String(el.value).trim()) continue;
+    if (el.tagName === 'SELECT' && el.selectedOptions && el.selectedOptions[0]) {
+      var txt = String(el.selectedOptions[0].textContent || '').trim();
+      if (txt && txt.indexOf('--') !== 0 && txt.indexOf('+ Nieuwe') !== 0) return txt;
+    }
+    return String(el.value).trim();
+  }
+  return '';
+}
+
+function normDropboxName(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function buildDropboxProjectFolder(projectnr) {
+  var nummer = cleanDropboxPart(projectnr || getDropboxFieldValue(['f-kenmerk', 'pva-projectnr', 'oplever-projectnr', 'wb-kenmerk', 'olo-projectnr']), 'Zonder projectnummer');
+  var locatie = cleanDropboxPart(getDropboxFieldValue(['f-locatie', 'pva-locatie', 'oplever-locatie', 'olo-locatie']), '');
+  if (!locatie) return nummer;
+  if (normDropboxName(nummer).indexOf(normDropboxName(locatie)) !== -1) return nummer;
+  return nummer + ' - ' + locatie;
+}
+
+function getDropboxDocFolder(docType) {
+  return DROPBOX_DOC_FOLDER_MAP[docType] || cleanDropboxPart(docType, 'Documenten');
+}
+
 async function uploadToDropbox(pdfDoc, filename, klant, projectnr, docType) {
   try {
     console.log('Dropbox upload:', {klant, projectnr, docType, filename});
     var pdfBase64 = pdfDoc.output('datauristring').split(',')[1];
-    var klantFolder = (klant || 'Zonder_klant').replace(/[^a-zA-Z0-9 _-]/g, '').trim();
-    var projectFolder = (projectnr || 'Zonder_projectnummer').replace(/[^a-zA-Z0-9 _-]/g, '').trim();
-    var folderPath = '/Ground Research/' + klantFolder + '/' + projectFolder + '/' + docType;
+    var klantFolder = cleanDropboxPart(klant || getDropboxFieldValue(['f-klant', 'pva-klant', 'oplever-klant', 'wb-bedrijf', 'olo-projectnaam']), 'Zonder klant');
+    var projectFolder = buildDropboxProjectFolder(projectnr);
+    var docFolder = getDropboxDocFolder(docType);
+    var projectRoot = DROPBOX_BASE_PROJECT_PATH + '/' + klantFolder + '/' + projectFolder;
+    var folderPath = projectRoot + '/' + docFolder;
     var dropboxPath = folderPath + '/' + filename;
-    // Eerst map aanmaken
+
+    // Eerst volledige standaard projectmapstructuur aanmaken
     await fetch('/api/dropbox/upload', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ folderPath: folderPath })
+      body: JSON.stringify({ folderPath: projectRoot, createProjectStructure: true })
     });
-    // Dan bestand uploaden
+
+    // Dan bestand uploaden naar de juiste submap
     var response = await fetch('/api/dropbox/upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filePath: dropboxPath, fileContent: pdfBase64, fileName: filename })
+      body: JSON.stringify({ filePath: dropboxPath, fileContent: pdfBase64, fileName: filename, projectRoot: projectRoot })
     });
     var result = await response.json();
     if (result.success) {
@@ -184,6 +241,151 @@ async function wkoQueryBuffer(baseUrl, layerId, x, y, dist) {
   return await resp.json();
 }
 
+
+// ITGBES-methodiek (gesloten ↔ gesloten) voor indicatieve/rapportageberekening.
+// Coëfficiënten volgen de correlatietabel uit de aangeleverde ITGBES-workbook.
+const ITGBES_CORRELATIES = [[-0.0005,0.03966,0.03966,0.00029,-0.01917,-0.01917,-4e-05,0.00228,0.00228],[0.00016,0.05716,0.05716,-8e-05,-0.02653,-0.02653,1e-05,0.00305,0.00305],[0.00014,0.06404,0.06404,-7e-05,-0.0293,-0.0293,1e-05,0.00332,0.00332],[0.00012,0.06752,0.06752,-7e-05,-0.0307,-0.0307,1e-05,0.00346,0.00346],[2e-05,0.071,0.071,-3e-05,-0.0321,-0.0321,1e-05,0.0036,0.0036],[0.0002,0.07448,0.07448,-0.00013,-0.0335,-0.0335,2e-05,0.00374,0.00374],[-0.00071,0.07619,0.08211,0.00042,-0.03358,-0.03683,-8e-05,0.00368,0.0041],[0.0003,0.02678,0.02678,-0.00017,-0.01282,-0.01282,2e-05,0.00151,0.00151],[5e-05,0.03935,0.03935,-7e-05,-0.01782,-0.01782,1e-05,0.002,0.002],[6e-05,0.04459,0.04459,-2e-05,-0.01973,-0.01973,0.0,0.00217,0.00217],[-9e-05,0.04729,0.04729,3e-05,-0.0207,-0.0207,0.0,0.00225,0.00225],[0.0001,0.05,0.05,-7e-05,-0.02167,-0.02167,1e-05,0.00234,0.00234],[-0.0041,0.05271,0.05271,0.00027,-0.02264,-0.02264,-4e-05,0.00242,0.00242],[-0.00132,0.05276,0.05917,0.00113,-0.0219,-0.02538,-0.00018,0.00226,0.00271],[0.00014,0.02017,0.02017,-0.0001,-0.00961,-0.00961,1e-05,0.00113,0.00113],[0.0002,0.02989,0.02989,-8e-05,-0.01332,-0.01332,1e-05,0.00148,0.00148],[2e-05,0.0341,0.0341,1e-05,-0.01473,-0.01473,-1e-05,0.00159,0.00159],[-0.00017,0.0363,0.0363,0.00011,-0.01544,-0.01544,-2e-05,0.00164,0.00164],[-9e-05,0.03852,0.03852,4e-05,-0.01615,-0.01615,0.0,0.00168,0.00168],[9e-05,0.04074,0.04074,-5e-05,-0.01686,-0.01686,1e-05,0.00173,0.00173],[-0.00093,0.04024,0.04593,0.00068,-0.1589,-0.01894,-9e-05,0.00155,0.00194],[-0.00019,0.01617,0.01617,0.0002,-0.00767,-0.00767,-3e-05,0.0009,0.0009],[-8e-05,0.02406,0.02406,4e-05,-0.01061,-0.01061,-1e-05,0.00116,0.00116],[4e-05,0.02755,0.02755,-2e-05,-0.0117,-0.0117,0.0,0.00124,0.00124],[0.00054,0.0294,0.0294,-0.00038,-0.01223,-0.01223,6e-05,0.00127,0.00127],[-6e-05,0.03128,0.03128,3e-05,-0.01276,-0.01276,0.0,0.00129,0.00129],[0.00027,0.03316,0.03316,-0.00018,-0.01329,-0.01329,3e-05,0.00132,0.00132],[-0.00018,0.03257,0.03721,0.00014,-0.01235,-0.01477,-2e-05,0.00115,0.00145],[0.00043,0.01349,0.01349,-0.0002,-0.00639,-0.00639,2e-05,0.00075,0.00075],[-0.0002,0.02012,0.02012,0.00016,-0.0088,-0.0088,-2e-05,0.00096,0.00096],[0.00012,0.02309,0.02309,-7e-05,-0.00967,-0.00967,1e-05,0.00101,0.00101],[-0.0048,0.02468,0.02468,-0.00031,-0.01008,-0.01008,-0.0004,0.00103,0.00103],[0.00013,0.0263,0.0263,-0.00012,-0.01049,-0.01049,2e-05,0.00104,0.00104],[6e-05,0.02793,0.02793,-3e-05,-0.01089,-0.01089,0.0,0.00105,0.00105],[-0.0061,0.02741,0.03118,0.00037,-0.01004,-0.01196,-5e-05,0.00089,0.00113],[0.00028,0.01157,0.01157,-0.0002,-0.00547,-0.00547,3e-05,0.00064,0.00064],[-0.00029,0.01727,0.01727,0.0002,-0.00751,-0.00751,-3e-05,0.00082,0.00082],[-0.00034,0.01986,0.01986,0.0,-0.00822,-0.00822,0.0,0.00085,0.00085],[0.00063,0.02125,0.02125,0.00021,-0.00855,-0.00855,-3e-05,0.00086,0.00086],[0.00014,0.02268,0.02268,-0.0031,-0.00887,-0.00887,4e-05,0.00086,0.00086],[-0.0002,0.02411,0.02411,-0.00013,-0.00918,-0.00918,2e-05,0.00086,0.00086],[-0.00026,0.02372,0.002663,6e-05,-0.00844,-0.00987,0.0,0.00072,0.00089]];
+
+function numVal(v, fallback = null) {
+  if (v === null || v === undefined || v === '') return fallback;
+  const n = Number(String(v).replace(',', '.'));
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function getInputNum(id, fallback = null) {
+  const el = document.getElementById(id);
+  return numVal(el?.value, fallback);
+}
+
+function pickFirstNum(obj, keys, fallback = null) {
+  for (const k of keys) {
+    const n = numVal(obj?.[k], null);
+    if (Number.isFinite(n)) return n;
+  }
+  return fallback;
+}
+
+function buildNewItgbesSystem(report) {
+  const depth = getInputNum('wko-it-diepte', getInputNum('pva-diepteperlus', getInputNum('pva-boordiepte', 150))) || 150;
+  const lussen = getInputNum('wko-it-lussen', getInputNum('pva-lussen', 1)) || 1;
+  return {
+    id: 'Nieuw',
+    label: 'Nieuw systeem',
+    type: 'GBES',
+    x: Math.round(report.location?.rdX || 0),
+    y: Math.round(report.location?.rdY || 0),
+    totalLoopLength: getInputNum('wko-it-luslengte', lussen * depth) || (lussen * depth),
+    endDepth: depth,
+    power: getInputNum('wko-it-vermogen', 0) || 0,
+    heatDemand: getInputNum('wko-it-warmte', 0) || 0,
+    coldDemand: getInputNum('wko-it-koude', 0) || 0,
+    spf: getInputNum('wko-it-spf', 5) || 5,
+    coolingSpf: getInputNum('wko-it-coolspf', 20) || 20,
+    source: 'boorapp'
+  };
+}
+
+function buildExistingItgbesSystem(inst, idx) {
+  const endDepth = pickFirstNum(inst, ['einddiepte','diepte','max_diepte','diepte_m'], null);
+  const heatDemand = pickFirstNum(inst, ['warmtevraag','warmte_vraag','warmtebehoefte'], null);
+  const coldDemand = pickFirstNum(inst, ['koudevraag','koude_vraag','koudebehoefte'], null);
+  const spf = pickFirstNum(inst, ['energierendement','spf','rendement'], 5);
+  const power = pickFirstNum(inst, ['bodemzijdigvermogen','vermogen','pompcapaciteit'], 0);
+  const putten = pickFirstNum(inst, ['aantal_putten','aantal_bodemlussen','aantal_lussen'], 1) || 1;
+  return {
+    id: inst.id || inst.installatie_id || idx + 1,
+    label: `Bestaand ${inst.id || inst.installatie_id || idx + 1}`,
+    type: 'GBES',
+    x: numVal(inst.x), y: numVal(inst.y),
+    totalLoopLength: pickFirstNum(inst, ['totale_lengte','tot_lengte','luslengte'], (endDepth || 0) * putten),
+    endDepth, power, heatDemand, coldDemand,
+    spf: spf || 5,
+    coolingSpf: 20,
+    source: 'rvo',
+    raw: inst
+  };
+}
+
+function itgbesCoeffRow(soilTc, depth) {
+  let tcStart;
+  if (soilTc >= 0.75 && soilTc <= 1.25) tcStart = 0;
+  else if (soilTc > 1.25 && soilTc <= 1.75) tcStart = 7;
+  else if (soilTc > 1.75 && soilTc <= 2.25) tcStart = 14;
+  else if (soilTc > 2.25 && soilTc <= 2.75) tcStart = 21;
+  else if (soilTc > 2.75 && soilTc <= 3.25) tcStart = 28;
+  else if (soilTc > 3.25 && soilTc <= 3.75) tcStart = 35;
+  else tcStart = 14; // veilige default: 2.0 W/mK
+  let dOff = 7;
+  if (depth >= 0 && depth <= 37.5) dOff = 1;
+  else if (depth > 37.5 && depth <= 62.5) dOff = 2;
+  else if (depth > 62.5 && depth <= 87.5) dOff = 3;
+  else if (depth > 87.5 && depth <= 125) dOff = 4;
+  else if (depth > 125 && depth <= 225) dOff = 5;
+  else if (depth > 225 && depth <= 500) dOff = 6;
+  return ITGBES_CORRELATIES[tcStart + dOff - 1];
+}
+
+function enrichItgbesSystem(s, soilTc) {
+  const heat = numVal(s.heatDemand, 0);
+  const cold = numVal(s.coldDemand, 0);
+  const spf = numVal(s.spf, 5) || 5;
+  const coolSpf = numVal(s.coolingSpf, 20) || 20;
+  const depth = numVal(s.endDepth, 0);
+  const netHeat = heat - ((heat + cold) / spf) + (cold / coolSpf);
+  const netCool = cold + (cold / 20);
+  const netGround = -netHeat + netCool;
+  const specificHeat = depth ? (-netHeat * 1000 / depth) : 0;
+  const specificCool = depth ? (netCool * 1000 / depth) : 0;
+  const c = itgbesCoeffRow(soilTc, depth);
+  const C = c[0] + c[1] * specificHeat + c[2] * specificCool;
+  const A = c[3] + c[4] * specificHeat + c[5] * specificCool;
+  const B = c[6] + c[7] * specificHeat + c[8] * specificCool;
+  return { ...s, netHeat, netCool, netGround, specificHeat, specificCool, coeff: { C, A, B } };
+}
+
+function calculateItgbesInterference(report) {
+  const soilTc = getInputNum('wko-it-soiltc', 2.0) || 2.0;
+  const nieuw = buildNewItgbesSystem(report);
+  const candidates = (report.installaties || [])
+    .filter(i => i.type === 'GBES' && Number.isFinite(numVal(i.x)) && Number.isFinite(numVal(i.y)))
+    .map((i, idx) => {
+      const s = buildExistingItgbesSystem(i, idx);
+      const distNew = Math.hypot(nieuw.x - s.x, nieuw.y - s.y);
+      return {...s, distNew};
+    })
+    .filter(s => s.distNew >= 5 && s.distNew <= 140)
+    .sort((a,b) => a.distNew - b.distNew)
+    .slice(0, 19);
+  const missing = candidates.filter(s => !(s.endDepth > 0) || s.heatDemand === null || s.coldDemand === null);
+  const usable = candidates.filter(s => (s.endDepth > 0) && s.heatDemand !== null && s.coldDemand !== null);
+  const systems = [nieuw, ...usable].map(s => enrichItgbesSystem(s, soilTc));
+  const n = systems.length;
+  const distances = Array.from({length:n}, () => Array(n).fill(0));
+  const effects = Array.from({length:n}, () => Array(n).fill(null));
+  const totals = Array(n).fill(0);
+  for (let i=0;i<n;i++) {
+    for (let j=0;j<n;j++) {
+      if (i === j) { distances[i][j] = 0; continue; }
+      const d = Math.hypot(systems[i].x - systems[j].x, systems[i].y - systems[j].y);
+      distances[i][j] = d;
+      if (d >= 5 && d <= 140) {
+        const lnD = Math.log(d);
+        let t = systems[i].coeff.C + systems[i].coeff.A * lnD + systems[i].coeff.B * lnD * lnD;
+        if (t > 0) t = 0;
+        effects[i][j] = t;
+        totals[j] += t;
+      } else {
+        effects[i][j] = 'X';
+      }
+    }
+  }
+  return { soilTc, systems, distances, effects, totals, missing };
+}
+
+function fmtNL(n, dec = 2) {
+  return Number.isFinite(n) ? n.toLocaleString('nl-NL', { minimumFractionDigits: dec, maximumFractionDigits: dec }) : '-';
+}
+
 async function startWKO() {
   const address = document.getElementById('f-locatie').value.trim();
   if (!address) { alert('Vul eerst een adres in bij "Locatie boringen"'); return; }
@@ -325,7 +527,7 @@ async function startWKO() {
       geometryType:'esriGeometryPoint', spatialRel:'esriSpatialRelIntersects',
       distance:'750', units:'esriSRUnit_Meter',
       outFields:'*',
-      returnGeometry:'false', inSR:'28992'
+      returnGeometry:'true', inSR:'28992', outSR:'28992'
     });
     // Layer 0 = Installaties (all types), Layer 3 = Gesloten (more detail)
     const [instResp, gbesResp, obesResp] = await Promise.all([
@@ -336,21 +538,30 @@ async function startWKO() {
     
     // Deduplicate by installatie_id, merge details
     const installaties = new Map();
+    const getInstXY = (feature) => {
+      const a = feature.attributes || {};
+      const x = Number(a.X ?? a.x ?? feature.geometry?.x);
+      const y = Number(a.Y ?? a.y ?? feature.geometry?.y);
+      return { x, y, ok: Number.isFinite(x) && Number.isFinite(y) };
+    };
     for (const f of (instResp.features || [])) {
       const a = f.attributes;
-      if (a.X && a.Y) installaties.set(a.installatie_id, { ...a, id: a.installatie_id, x: a.X, y: a.Y });
+      const xy = getInstXY(f);
+      if (xy.ok) installaties.set(a.installatie_id, { ...a, id: a.installatie_id, x: xy.x, y: xy.y });
     }
     for (const f of (gbesResp.features || [])) {
       const a = f.attributes;
+      const xy = getInstXY(f);
       const existing = installaties.get(a.installatie_id);
-      if (existing) { Object.assign(existing, a, { x: existing.x, y: existing.y }); }
-      else if (a.X && a.Y) installaties.set(a.installatie_id, { ...a, id: a.installatie_id, type: 'GBES', x: a.X, y: a.Y });
+      if (existing) { Object.assign(existing, a, { x: Number.isFinite(existing.x) ? existing.x : xy.x, y: Number.isFinite(existing.y) ? existing.y : xy.y }); }
+      else if (xy.ok) installaties.set(a.installatie_id, { ...a, id: a.installatie_id, type: 'GBES', x: xy.x, y: xy.y });
     }
     for (const f of (obesResp.features || [])) {
       const a = f.attributes;
+      const xy = getInstXY(f);
       const existing = installaties.get(a.installatie_id);
-      if (existing) { Object.assign(existing, a, { x: existing.x, y: existing.y }); }
-      else if (a.X && a.Y) installaties.set(a.installatie_id, { ...a, id: a.installatie_id, type: 'OBES', x: a.X, y: a.Y });
+      if (existing) { Object.assign(existing, a, { x: Number.isFinite(existing.x) ? existing.x : xy.x, y: Number.isFinite(existing.y) ? existing.y : xy.y }); }
+      else if (xy.ok) installaties.set(a.installatie_id, { ...a, id: a.installatie_id, type: 'OBES', x: xy.x, y: xy.y });
     }
     
     report.installaties = Array.from(installaties.values());
@@ -358,6 +569,15 @@ async function startWKO() {
     const obes = report.installaties.filter(i => i.type === 'OBES');
     const overig = report.installaties.filter(i => i.type !== 'GBES' && i.type !== 'OBES');
     addLog(`\u2714 ${report.installaties.length} bronnen (750m): ${gbes.length} gesloten, ${obes.length} open${overig.length ? ', ' + overig.length + ' overig' : ''}`);
+
+    try {
+      report.itgbes = calculateItgbesInterference(report);
+      const bestaande = Math.max(0, report.itgbes.systems.length - 1);
+      addLog(bestaande ? `\u2714 Interferentie berekend: ${bestaande} gesloten systemen binnen 140m` : '\u2714 Geen gesloten systemen binnen 140m voor ITGBES-berekening');
+      if (report.itgbes.missing?.length) addLog(`\u26A0 ${report.itgbes.missing.length} gesloten systemen binnen 140m overgeslagen: onvolledige diepte/warmte/koude-data`);
+    } catch (e) {
+      addLog('\u26A0 Interferentieberekening niet gelukt: ' + e.message);
+    }
 
     // 10. Kaartafbeelding ophalen voor PDF
     addLog('Kaart ophalen...');
@@ -605,6 +825,7 @@ function downloadWKOPdf() {
     if (gbes.length) { addText(`Gesloten systemen (GBES): ${gbes.length}`, M + 2, 8, [30, 100, 200], 'normal'); y += 5; }
     if (obes.length) { addText(`Open systemen (OBES): ${obes.length}`, M + 2, 8, [230, 81, 0], 'normal'); y += 5; }
     if (overig.length) { addText(`Overig (GWO e.d.): ${overig.length}`, M + 2, 8, GRIJS, 'normal'); y += 5; }
+    addText('RD X/Y-coördinaten staan per installatie onder de tabelregel.', M + 2, 7, GRIJS, 'normal'); y += 5;
     y += 3;
     
     // Alle installaties, gesorteerd op afstand
@@ -634,7 +855,7 @@ function downloadWKOPdf() {
     
     pdf.setFont('helvetica', 'normal');
     for (const inst of withDist) {
-      if (y + 5 > 275) {
+      if (y + 8 > 275) {
         pdf.addPage(); y = 20;
         // Herhaal header op nieuwe pagina
         pdf.setFillColor(240, 242, 245);
@@ -662,13 +883,103 @@ function downloadWKOPdf() {
       pdf.text(inst.aantal_putten ? String(inst.aantal_putten) : '-', M + 140, y);
       pdf.setTextColor(...LGRIJS);
       pdf.text(String(inst.id || ''), M + 155, y);
-      y += 4.2;
+      pdf.setFontSize(5.8);
+      pdf.setTextColor(...GRIJS);
+      const rdTxt = (Number.isFinite(inst.x) && Number.isFinite(inst.y))
+        ? `RD X/Y: ${Math.round(inst.x)} / ${Math.round(inst.y)}`
+        : 'RD X/Y: onbekend';
+      pdf.text(rdTxt, M + 14, y + 3.5);
+      y += 7.6;
       drawLine(M, y - 1, M + CW, y - 1, [240, 240, 240], 0.1);
     }
   } else {
     checkItem('Geen bodemenergiesystemen gevonden binnen 750 meter.', true);
   }
   y += 8;
+
+  // INTERFERENTIE / ITGBES-METHODIEK
+  if (r.itgbes) {
+    sectionHeader('INTERFERENTIE GESLOTEN SYSTEMEN (ITGBES-METHODIEK)');
+    const it = r.itgbes;
+    addText(`Warmtegeleidingscoefficient bodem: ${fmtNL(it.soilTc, 1)} W/mK`, M + 2, 8, ZWART, 'bold'); y += 6;
+    addText('Scope: gesloten bodemenergiesystemen met RD X/Y binnen 5-140 m. Open bronnen worden apart beoordeeld.', M + 2, 7, GRIJS, 'normal'); y += 6;
+
+    // Invoer gegevens
+    if (y + 35 > 275) { pdf.addPage(); y = 20; }
+    pdf.setFillColor(240, 242, 245); pdf.rect(M, y - 3.5, CW, 5.5, 'F');
+    pdf.setFontSize(6.2); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...BLAUW);
+    ['Nr','X','Y','Tot.lus','Diepte','kW','Warmte','Koude','SPF','SPF K'].forEach((h, idx) => pdf.text(h, M + [1,18,35,52,70,88,103,121,139,153][idx], y));
+    y += 5; pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
+    it.systems.forEach((s, idx) => {
+      if (y + 6 > 275) { pdf.addPage(); y = 20; }
+      pdf.setFontSize(6.2);
+      const vals = [idx+1, Math.round(s.x), Math.round(s.y), fmtNL(s.totalLoopLength,0), fmtNL(s.endDepth,0), fmtNL(s.power,1), fmtNL(s.heatDemand,2), fmtNL(s.coldDemand,2), fmtNL(s.spf,2), fmtNL(s.coolingSpf,0)];
+      vals.forEach((v, c) => pdf.text(String(v), M + [1,18,35,52,70,88,103,121,139,153][c], y));
+      pdf.setTextColor(...LGRIJS); pdf.text(String(s.id || ''), M + 168, y); pdf.setTextColor(...ZWART);
+      y += 4.5;
+    });
+    y += 4;
+
+    // Berekende gegevens
+    if (y + 25 > 275) { pdf.addPage(); y = 20; }
+    pdf.setFillColor(240, 242, 245); pdf.rect(M, y - 3.5, CW, 5.5, 'F');
+    pdf.setFontSize(6.2); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...BLAUW);
+    ['Nr','Netto warmte','Netto koude','Netto bodem','Spec. onttrek.','Spec. toevoer'].forEach((h, idx) => pdf.text(h, M + [1,18,48,78,108,143][idx], y));
+    y += 5; pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...ZWART);
+    it.systems.forEach((s, idx) => {
+      if (y + 6 > 275) { pdf.addPage(); y = 20; }
+      [idx+1, fmtNL(s.netHeat,4), fmtNL(s.netCool,4), fmtNL(s.netGround,4), fmtNL(s.specificHeat,4), fmtNL(s.specificCool,4)].forEach((v,c) => pdf.text(String(v), M + [1,18,48,78,108,143][c], y));
+      y += 4.5;
+    });
+    y += 4;
+
+    // Afstandenmatrix (max 20 systemen past net met kleine font)
+    const n = it.systems.length;
+    if (n > 1) {
+      if (y + 18 + n*4 > 275) { pdf.addPage(); y = 20; }
+      addText('Afstanden tussen systemen (m)', M + 2, 8, BLAUW, 'bold'); y += 5;
+      pdf.setFontSize(5.8); pdf.setTextColor(...ZWART);
+      pdf.text('Systeem', M + 1, y);
+      for (let j=0;j<n;j++) pdf.text(String(j+1), M + 25 + j*7, y);
+      y += 4;
+      for (let i=0;i<n;i++) {
+        pdf.text(String(i+1), M + 1, y);
+        for (let j=0;j<n;j++) pdf.text(fmtNL(it.distances[i][j],2), M + 25 + j*7, y);
+        y += 4;
+      }
+      y += 4;
+
+      if (y + 18 + n*4 > 275) { pdf.addPage(); y = 20; }
+      addText('T-effecten (graden C)', M + 2, 8, BLAUW, 'bold'); y += 5;
+      pdf.setFontSize(5.8); pdf.setTextColor(...ZWART);
+      pdf.text('Systeem', M + 1, y);
+      for (let j=0;j<n;j++) pdf.text(String(j+1), M + 25 + j*8, y);
+      y += 4;
+      for (let i=0;i<n;i++) {
+        pdf.text(String(i+1), M + 1, y);
+        for (let j=0;j<n;j++) {
+          const v = it.effects[i][j];
+          pdf.text(i === j ? '' : (v === 'X' ? 'X' : fmtNL(v,3)), M + 25 + j*8, y);
+        }
+        y += 4;
+      }
+      pdf.setFont('helvetica','bold'); pdf.text('Totaal effect', M + 1, y);
+      for (let j=0;j<n;j++) pdf.text(fmtNL(it.totals[j],3), M + 25 + j*8, y);
+      pdf.setFont('helvetica','normal'); y += 7;
+      const worst = Math.min(...it.totals);
+      const concl = worst < 0 ? `Maximaal berekend temperatuureffect: ${fmtNL(worst,3)} graden C. Resultaat opnemen in interferentiebeoordeling.` : 'Geen negatief temperatuureffect berekend binnen de gekozen scope.';
+      const lines = pdf.splitTextToSize(concl, CW - 4);
+      pdf.setTextColor(...GRIJS); pdf.text(lines, M + 2, y); y += lines.length * 3.5 + 4;
+    } else {
+      checkItem('Geen gesloten systemen met volledige rekendata binnen 140 m gevonden.', true);
+    }
+    if (it.missing?.length) {
+      pdf.setTextColor(...GRIJS); pdf.setFontSize(6.8);
+      const txt = `${it.missing.length} gesloten systeem/systemen binnen 140 m zijn niet doorgerekend door ontbrekende diepte, warmtevraag of koudevraag in de WKO-data.`;
+      pdf.text(pdf.splitTextToSize(txt, CW - 4), M + 2, y); y += 8;
+    }
+    y += 6;
+  }
 
   // TOELICHTING
   sectionHeader('TOELICHTING');
@@ -736,7 +1047,7 @@ function parseEur(s) {
 // ============================================================
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach((t, i) => {
-    const tabs = ['offerte', 'klanten', 'opgeslagen', 'pva', 'oplever', 'werkbon'];
+    const tabs = ['offerte', 'klanten', 'opgeslagen', 'pva', 'oplever', 'werkbon', 'olo'];
     t.classList.toggle('active', tabs[i] === name);
   });
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -747,6 +1058,371 @@ function switchTab(name) {
   if (name === 'pva') initPvaTab();
   if (name === 'oplever') initOpleverTab();
   if (name === 'werkbon') initWerkbonTab();
+  if (name === 'olo') initOloTab();
+}
+
+
+// ============================================================
+// OLO MELDING BODEMENERGIE
+// ============================================================
+let oloTabInited = false;
+let oloTekening = null;
+const OLO_SAVE_KEY = 'boorapp_olo_state';
+let _oloSaveTimer = null;
+
+function initOloTab() {
+  if (oloTabInited) return;
+  restoreOloState();
+  const tab = document.getElementById('tab-olo');
+  if (tab) {
+    tab.addEventListener('input', saveOloState);
+    tab.addEventListener('change', saveOloState);
+  }
+  if (!document.getElementById('olo-projectnr')?.value) prefillOloFromBoorApp(false);
+  oloTabInited = true;
+}
+
+function valById(id) { return document.getElementById(id)?.value || ''; }
+function setVal(id, value) { const el = document.getElementById(id); if (el && value !== undefined && value !== null && value !== '') el.value = value; }
+function fmtDateNL(v) { if (!v) return ''; const d = new Date(v); return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString('nl-NL'); }
+function nfmt(v, dec = 1) { const n = numVal(v, null); return Number.isFinite(n) ? n.toLocaleString('nl-NL', { maximumFractionDigits: dec }) : ''; }
+
+
+async function geocodeAddressToRd(address) {
+  if (!address) return null;
+  const resp = await fetch(`https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?q=${encodeURIComponent(address)}&rows=1`);
+  const data = await resp.json();
+  const doc = data.response?.docs?.[0];
+  const rdMatch = doc?.centroide_rd?.match(/POINT\(([^ ]+) ([^ ]+)\)/);
+  if (!rdMatch) return null;
+  return { rdX: parseFloat(rdMatch[1]), rdY: parseFloat(rdMatch[2]), address: doc.weergavenaam || address };
+}
+
+function isValidRdPair(p) {
+  return p && Number.isFinite(p.x) && Number.isFinite(p.y) && p.x >= 0 && p.x <= 300000 && p.y >= 300000 && p.y <= 625000;
+}
+
+function getOloMidpoint() {
+  const x = numVal(valById('olo-rdx'), null);
+  const y = numVal(valById('olo-rdy'), null);
+  return (Number.isFinite(x) && Number.isFinite(y)) ? { x, y } : null;
+}
+
+function rdDistance(a, b) {
+  if (!a || !b) return Infinity;
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function filterRdPairsByOloContext(pairs, maxDistanceM = 5000) {
+  const valid = (pairs || []).filter(isValidRdPair);
+  const mid = getOloMidpoint();
+  if (!mid) return valid;
+  const near = valid.filter(p => rdDistance(p, mid) <= maxDistanceM);
+  // Als er een ingevuld/adres-middelpunt is, liever geen boorpunten dan compleet verkeerde boorpunten.
+  return near;
+}
+
+function parseRdPairsFromText(text, useOloContext = false) {
+  const pairs = [];
+  const clean = String(text || '').replace(/\s+/g, ' ');
+  const re = /(?:X|RD\s*X)?\s*[:=]?\s*(\d{5,6}(?:[,.]\d+)?)\D{1,24}(?:Y|RD\s*Y)?\s*[:=]?\s*(\d{5,6}(?:[,.]\d+)?)/gi;
+  let m;
+  while ((m = re.exec(clean)) && pairs.length < 300) {
+    const x = numVal(m[1], null);
+    const y = numVal(m[2], null);
+    if (isValidRdPair({ x, y })) pairs.push({ x, y });
+  }
+  return useOloContext ? filterRdPairsByOloContext(pairs) : pairs;
+}
+
+function fillOloMidpointFromPairs(pairs, overwrite = false) {
+  pairs = (pairs || []).filter(isValidRdPair);
+  if (!pairs || !pairs.length) return false;
+  const hasMid = valById('olo-rdx').trim() && valById('olo-rdy').trim();
+  if (hasMid && !overwrite) return false;
+  const avgX = pairs.reduce((sum, p) => sum + p.x, 0) / pairs.length;
+  const avgY = pairs.reduce((sum, p) => sum + p.y, 0) / pairs.length;
+  setVal('olo-rdx', Math.round(avgX));
+  setVal('olo-rdy', Math.round(avgY));
+  return true;
+}
+
+async function prefillOloFromBoorApp(showAlert = true) {
+  const d = gatherOfferteData();
+  const firstCluster = d.clusters?.[0] || {};
+  const wko = window._lastWKOReport;
+  const depth = getInputNum('wko-it-diepte', firstCluster.diepte || d.mpb || '');
+  const lussen = getInputNum('wko-it-lussen', firstCluster.boringen || d.boringen || '');
+  // OLO vraagt om totale boordiepte/einddiepte per boorpunt, niet heen+terug luslengte.
+  // Voorbeeld: 2 boorpunten x 200m = 400m (niet 800m).
+  const luslengte = (Number(depth) && Number(lussen)) ? Number(depth) * Number(lussen) : getInputNum('wko-it-luslengte', '');
+
+  setVal('olo-projectnr', d.kenmerk);
+  setVal('olo-projectnaam', d.betreft || d.klantNaam || 'Pomp woonhuis');
+  setVal('olo-locatie', d.locatie);
+  setVal('olo-vermogen', getInputNum('wko-it-vermogen', firstCluster.vermogen || d.vermogen || ''));
+  setVal('olo-warmte', getInputNum('wko-it-warmte', ''));
+  setVal('olo-koude', getInputNum('wko-it-koude', ''));
+  setVal('olo-diepte', depth);
+  setVal('olo-lussen', lussen);
+  setVal('olo-luslengte', luslengte);
+
+  let coordSource = '';
+  if (wko?.location?.rdX && wko?.location?.rdY) {
+    setVal('olo-rdx', Math.round(wko.location.rdX));
+    setVal('olo-rdy', Math.round(wko.location.rdY));
+    coordSource = ' + WKO coördinaten';
+  } else if (!valById('olo-rdx').trim() || !valById('olo-rdy').trim()) {
+    try {
+      const geo = await geocodeAddressToRd(d.locatie);
+      if (geo?.rdX && geo?.rdY) {
+        setVal('olo-rdx', Math.round(geo.rdX));
+        setVal('olo-rdy', Math.round(geo.rdY));
+        coordSource = ' + RD middelpunt via adres';
+      }
+    } catch(e) {}
+  }
+  if (!coordSource && oloTekening?.pdfText) {
+    if (fillOloMidpointFromPairs(parseRdPairsFromText(oloTekening.pdfText))) coordSource = ' + middelpunt uit boorpunten';
+  }
+  saveOloState();
+  if (showAlert) showDropboxNotification('OLO gegevens overgenomen uit BoorApp' + coordSource, 'success');
+}
+
+function gatherOloData() {
+  return {
+    projectnr: valById('olo-projectnr'), projectnaam: valById('olo-projectnaam'), locatie: valById('olo-locatie'), planning: valById('olo-planning'),
+    vermogen: valById('olo-vermogen'), warmte: valById('olo-warmte'), koude: valById('olo-koude'), diepte: valById('olo-diepte'), lussen: valById('olo-lussen'), luslengte: valById('olo-luslengte'),
+    mintemp: valById('olo-mintemp'), maxtemp: valById('olo-maxtemp'), individueel: valById('olo-individueel'), verticaal: valById('olo-verticaal'), nietgestapeld: valById('olo-nietgestapeld'), gestapeld: valById('olo-gestapeld'),
+    rdx: valById('olo-rdx'), rdy: valById('olo-rdy'), boorpunten: valById('olo-boorpunten')
+  };
+}
+
+function saveOloState() {
+  clearTimeout(_oloSaveTimer);
+  _oloSaveTimer = setTimeout(() => {
+    try { localStorage.setItem(OLO_SAVE_KEY, JSON.stringify({ data: gatherOloData(), tekening: oloTekening })); } catch(e) {}
+  }, 250);
+}
+
+function restoreOloState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(OLO_SAVE_KEY) || '{}');
+    if (saved.data) Object.entries(saved.data).forEach(([k, v]) => setVal('olo-' + k, v));
+    if (saved.tekening) { oloTekening = saved.tekening; renderOloTekeningPreview(); }
+  } catch(e) {}
+}
+
+async function extractPdfText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(e.target.result) }).promise;
+        let text = '';
+        for (let p = 1; p <= pdf.numPages; p++) {
+          const page = await pdf.getPage(p);
+          const content = await page.getTextContent();
+          text += content.items.map(i => i.str || '').join(' ') + '\n';
+        }
+        resolve(text);
+      } catch(err) { reject(err); }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function parseCoordsFromText(text) {
+  const lines = [];
+  const clean = String(text || '').replace(/\s+/g, ' ');
+  const re = /(?:B(?:oring|oorpunt)?\s*)?(\d{1,3})?[^0-9]{0,12}(?:X|RD\s*X)?\s*[:=]?\s*(\d{5,6}(?:[,.]\d+)?)\D{1,20}(?:Y|RD\s*Y)?\s*[:=]?\s*(\d{5,6}(?:[,.]\d+)?)/gi;
+  let m;
+  const mid = getOloMidpoint();
+  while ((m = re.exec(clean)) && lines.length < 200) {
+    const p = { x: numVal(m[2], null), y: numVal(m[3], null) };
+    if (!isValidRdPair(p)) continue;
+    if (mid && rdDistance(p, mid) > 5000) continue;
+    const label = m[1] ? 'B' + String(m[1]).padStart(2, '0') : 'Punt ' + (lines.length + 1);
+    lines.push(`${label}: X ${Math.round(p.x)}, Y ${Math.round(p.y)}`);
+  }
+  return Array.from(new Set(lines));
+}
+
+async function loadOloTekeningFile(file) {
+  const rendered = file.type === 'application/pdf' ? await renderPdfToImage(file) : await readImageFile(file);
+  rendered.pdfText = '';
+  if (file.type === 'application/pdf') {
+    try {
+      rendered.pdfText = await extractPdfText(file);
+      const coords = parseCoordsFromText(rendered.pdfText);
+      const bpEl = document.getElementById('olo-boorpunten');
+      if (bpEl) bpEl.value = coords.length ? coords.join('\n') : '';
+      fillOloMidpointFromPairs(parseRdPairsFromText(rendered.pdfText, true));
+      if (!coords.length) showDropboxNotification('Geen betrouwbare RD-boorpunten gevonden in tekening (foute/verre matches genegeerd)', 'error');
+    } catch(e) {}
+  }
+  oloTekening = rendered;
+  renderOloTekeningPreview();
+  saveOloState();
+}
+
+async function handleOloTekeningDrop(e) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = '#d0d5dd';
+  e.currentTarget.style.background = '#f8f9fb';
+  const f = Array.from(e.dataTransfer.files).find(f => f.type === 'application/pdf' || f.type.startsWith('image/'));
+  if (!f) return;
+  try { await loadOloTekeningFile(f); } catch(err) { alert('Kon tekening niet laden: ' + err.message); }
+}
+
+async function handleOloTekeningSelect(e) {
+  const f = Array.from(e.target.files).find(f => f.type === 'application/pdf' || f.type.startsWith('image/'));
+  if (!f) return;
+  try { await loadOloTekeningFile(f); } catch(err) { alert('Kon tekening niet laden: ' + err.message); }
+  e.target.value = '';
+}
+
+function removeOloTekening() {
+  oloTekening = null;
+  renderOloTekeningPreview();
+  saveOloState();
+}
+
+function renderOloTekeningPreview() {
+  const container = document.getElementById('olo-tekening-preview');
+  if (!container) return;
+  if (!oloTekening) { container.innerHTML = ''; return; }
+  const pageCount = oloTekening.pages?.length || 1;
+  container.innerHTML = '<div style="position:relative; display:inline-block; max-width:100%;">' +
+    '<img src="' + oloTekening.dataUrl + '" style="max-width:100%; max-height:220px; border-radius:6px; border:1px solid #ddd;">' +
+    '<div style="font-size:11px; color:#2e7d32; margin-top:4px;">✅ ' + oloTekening.name + (pageCount > 1 ? ' (' + pageCount + ' pagina\'s)' : '') + '</div>' +
+    '</div>';
+}
+
+function addOloHeader(pdf, title) {
+  pdf.setFillColor(30, 58, 95);
+  pdf.rect(0, 0, 210, 22, 'F');
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(15);
+  pdf.text(title, 14, 14);
+  pdf.setTextColor(0, 0, 0);
+}
+
+function addKVTable(pdf, rows, x, y, w) {
+  pdf.autoTable({
+    startY: y,
+    margin: { left: x, right: 14 },
+    tableWidth: w || 182,
+    styles: { fontSize: 9, cellPadding: 2.5, lineColor: [220,220,220], lineWidth: 0.1 },
+    headStyles: { fillColor: [30,58,95], textColor: 255 },
+    body: rows.map(r => [r[0], r[1] || '-']),
+    theme: 'grid',
+    columnStyles: { 0: { cellWidth: 70, fontStyle: 'bold', fillColor: [248,249,251] }, 1: { cellWidth: (w || 182) - 70 } }
+  });
+  return pdf.lastAutoTable.finalY;
+}
+
+
+function parseBoorpuntenTableRows(text) {
+  const rows = [];
+  const lines = String(text || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  lines.forEach((line, idx) => {
+    const m = line.match(/^\s*([^:;,-]+?)\s*[:;-]?\s*(?:X|RD\s*X)?\s*[:=]?\s*(\d{5,6}(?:[,.]\d+)?)\D+?(?:Y|RD\s*Y)?\s*[:=]?\s*(\d{5,6}(?:[,.]\d+)?)/i);
+    if (m) rows.push([m[1].trim() || `B${String(idx + 1).padStart(2, '0')}`, m[2].replace('.', ','), m[3].replace('.', ',')]);
+  });
+  if (!rows.length) {
+    parseRdPairsFromText(text, true).forEach((p, idx) => rows.push([`B${String(idx + 1).padStart(2, '0')}`, Math.round(p.x).toString(), Math.round(p.y).toString()]));
+  }
+  return rows;
+}
+
+function addBoorpuntenTable(pdf, text, y, title = 'Boorpunten') {
+  const rows = parseBoorpuntenTableRows(text);
+  if (!rows.length) return y;
+  y += 8;
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(11);
+  pdf.setTextColor(30,58,95);
+  pdf.text(title, 14, y);
+  y += 5;
+  pdf.autoTable({
+    startY: y,
+    margin: { left: 14, right: 14 },
+    tableWidth: 120,
+    head: [['Boorpunt', 'RD X', 'RD Y']],
+    body: rows,
+    theme: 'grid',
+    styles: { fontSize: 9, cellPadding: 2.5, lineColor: [220,220,220], lineWidth: 0.1 },
+    headStyles: { fillColor: [30,58,95], textColor: 255, fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 34, fontStyle: 'bold', fillColor: [248,249,251] },
+      1: { cellWidth: 43, halign: 'right' },
+      2: { cellWidth: 43, halign: 'right' }
+    }
+  });
+  return pdf.lastAutoTable.finalY;
+}
+
+function makeOloFilename(prefix, d) {
+  const base = (d.projectnr || d.projectnaam || 'OLO').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
+  return `${prefix}_${base || 'melding'}.pdf`;
+}
+
+function downloadOloGegevensPdf() {
+  const d = gatherOloData();
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  addOloHeader(pdf, 'Gegevens systeem - bodemenergie');
+  pdf.setFontSize(10);
+  pdf.setTextColor(80, 80, 80);
+  pdf.text('Ground Research BV - bijlage OLO melding', 14, 30);
+  let y = addKVTable(pdf, [
+    ['Project / systeem', d.projectnaam], ['Projectnummer', d.projectnr], ['Locatie', d.locatie], ['Planning', fmtDateNL(d.planning)],
+    ['Bodemzijdig vermogen (kW)', nfmt(d.vermogen)], ['Warmtevraag (MWh)', nfmt(d.warmte)], ['Koudevraag (MWh)', nfmt(d.koude)],
+    ['Individueel systeem', d.individueel], ['Woningbouw niet gestapeld', d.nietgestapeld], ['Woningbouw gestapeld', d.gestapeld],
+    ['Type verticaal systeem', d.verticaal], ['Diepte systeem (m)', nfmt(d.diepte, 0)], ['Aantal lussen / boorpunten', nfmt(d.lussen, 0)],
+    ['Totale luslengte (m)', nfmt(d.luslengte, 0)], ['Min. temperatuur (°C)', nfmt(d.mintemp)], ['Max. temperatuur (°C)', nfmt(d.maxtemp)]
+  ], 14, 38, 182);
+  y += 10;
+  pdf.setFont('helvetica', 'bold'); pdf.setFontSize(11); pdf.setTextColor(30,58,95); pdf.text('Coördinaten', 14, y); y += 6;
+  y = addKVTable(pdf, [['Middelpunt systeem RD X', d.rdx], ['Middelpunt systeem RD Y', d.rdy]], 14, y, 182);
+  if (d.boorpunten) y = addBoorpuntenTable(pdf, d.boorpunten, y, 'Boorpunten');
+  const filename = makeOloFilename('OLO_Gegevens_systeem', d);
+  pdf.save(filename);
+  uploadToDropbox(pdf, filename, d.projectnaam || '', d.projectnr || d.locatie || 'OLO', 'OLO melding');
+}
+
+function addTekeningPagesToPdf(pdf, drawing) {
+  if (!drawing) return;
+  const pages = drawing.pages?.length ? drawing.pages : [drawing];
+  pages.forEach((pg, idx) => {
+    pdf.addPage();
+    addOloHeader(pdf, 'Tekening boorpunten' + (pages.length > 1 ? ' - pagina ' + (idx + 1) : ''));
+    const maxW = 182, maxH = 245;
+    const ratio = Math.min(maxW / pg.w, maxH / pg.h);
+    const w = pg.w * ratio, h = pg.h * ratio;
+    pdf.addImage(pg.dataUrl, 'JPEG', 14 + (maxW - w) / 2, 32, w, h);
+  });
+}
+
+function downloadOloBijlagenPdf() {
+  const d = gatherOloData();
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  addOloHeader(pdf, 'Bijlagen OLO melding - bodemenergie');
+  pdf.setFontSize(10); pdf.setTextColor(80,80,80);
+  pdf.text('Bundel met systeemgegevens, coördinaten en tekening boorpunten.', 14, 30);
+  let y = addKVTable(pdf, [
+    ['Project / systeem', d.projectnaam], ['Projectnummer', d.projectnr], ['Locatie', d.locatie], ['Planning', fmtDateNL(d.planning)],
+    ['Middelpunt systeem RD X', d.rdx], ['Middelpunt systeem RD Y', d.rdy],
+    ['Bodemzijdig vermogen (kW)', nfmt(d.vermogen)], ['Diepte systeem (m)', nfmt(d.diepte, 0)], ['Totale luslengte (m)', nfmt(d.luslengte, 0)]
+  ], 14, 38, 182);
+  if (d.boorpunten) y = addBoorpuntenTable(pdf, d.boorpunten, y, 'Boorpunten / coördinaten');
+  addTekeningPagesToPdf(pdf, oloTekening);
+  const filename = makeOloFilename('OLO_Bijlagen', d);
+  pdf.save(filename);
+  uploadToDropbox(pdf, filename, d.projectnaam || '', d.projectnr || d.locatie || 'OLO', 'OLO melding');
 }
 
 // ============================================================

@@ -229,8 +229,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .form-row.full { grid-template-columns: 1fr; }
 .form-group { display: flex; flex-direction: column; }
 .form-group label { font-size: 12px; font-weight: 600; color: #555; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
-.form-group input, .form-group select { padding: 8px 10px; border: 1px solid #d0d5dd; border-radius: 5px; font-size: 14px; transition: border-color 0.2s; }
-.form-group input:focus, .form-group select:focus { outline: none; border-color: #4da6ff; box-shadow: 0 0 0 2px rgba(77,166,255,0.15); }
+.form-group input, .form-group select, .form-group textarea { padding: 8px 10px; border: 1px solid #d0d5dd; border-radius: 5px; font-size: 14px; transition: border-color 0.2s; font-family: inherit; }
+.form-group textarea { min-height: 72px; resize: vertical; }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #4da6ff; box-shadow: 0 0 0 2px rgba(77,166,255,0.15); }
 .form-group input[readonly] { background: #f5f7fa; color: #666; }
 .toggle-group { display: flex; align-items: center; gap: 10px; padding-top: 20px; }
 .toggle { position: relative; width: 44px; height: 24px; cursor: pointer; }
@@ -309,6 +310,7 @@ const BOORAPP_HTML = `
   <div class="tab" onclick="switchTab('pva')">Plan van Aanpak</div>
   <div class="tab" onclick="switchTab('oplever')">Opleverrapport</div>
   <div class="tab" onclick="switchTab('werkbon')">Werkbon</div>
+  <div class="tab" onclick="switchTab('olo')">OLO melding</div>
 </div>
 
 <div class="container">
@@ -366,9 +368,28 @@ const BOORAPP_HTML = `
             <label>Locatie boringen</label>
             <input type="text" id="f-locatie" placeholder="Adres boorlocatie">
             <div style="margin-top:6px; display:flex; gap:8px; align-items:center;">
-              <button class="btn btn-primary" style="padding:6px 14px; font-size:12px; background:#2d7d46;" onclick="startWKO()">🌍 WKO Rapport</button>
+              <button class="btn btn-primary" style="padding:6px 14px; font-size:12px; background:#2d7d46;" onclick="startWKO()">🌍 WKO Rapport + Interferentie</button>
               <span id="wko-status" style="font-size:11px; color:#666;"></span>
             </div>
+            <details style="margin-top:8px; padding:8px; background:#f8fafc; border:1px solid #e3e8ef; border-radius:6px;">
+              <summary style="cursor:pointer; font-size:12px; font-weight:600; color:#1e3a5f;">Interferentiegegevens nieuw GBES</summary>
+              <div class="form-row" style="margin-top:8px;">
+                <div class="form-group"><label>Aantal lussen</label><input type="number" id="wko-it-lussen" value="2" step="1"></div>
+                <div class="form-group"><label>Einddiepte per lus (m)</label><input type="number" id="wko-it-diepte" value="150" step="1"></div>
+                <div class="form-group"><label>Totale luslengte (m)</label><input type="number" id="wko-it-luslengte" placeholder="auto"></div>
+              </div>
+              <div class="form-row">
+                <div class="form-group"><label>Bodemzijdig vermogen (kW)</label><input type="number" id="wko-it-vermogen" step="0.1"></div>
+                <div class="form-group"><label>Warmtevraag (MWh/j)</label><input type="number" id="wko-it-warmte" step="0.1"></div>
+                <div class="form-group"><label>Koudevraag (MWh/j)</label><input type="number" id="wko-it-koude" step="0.1"></div>
+              </div>
+              <div class="form-row">
+                <div class="form-group"><label>SPF warmte</label><input type="number" id="wko-it-spf" value="5" step="0.01"></div>
+                <div class="form-group"><label>SPF koude</label><input type="number" id="wko-it-coolspf" value="20" step="0.1"></div>
+                <div class="form-group"><label>Warmtegeleiding bodem (W/mK)</label><input type="number" id="wko-it-soiltc" value="2.0" step="0.1"></div>
+              </div>
+              <div style="font-size:10px; color:#777;">Berekening: gesloten ↔ gesloten binnen 140 m, volgens ITGBES-methodiek. Open bronnen blijven aparte WKO-toets.</div>
+            </details>
             <div id="wko-progress" style="display:none; margin-top:8px; padding:10px; background:#f0f7ff; border-radius:6px; border:1px solid #d0e3f7;">
               <div style="font-size:12px; font-weight:600; color:#1e3a5f; margin-bottom:6px;">WKO Tool</div>
               <div id="wko-log" style="font-size:11px; color:#555; max-height:120px; overflow-y:auto;"></div>
@@ -1315,6 +1336,98 @@ const BOORAPP_HTML = `
   </div>
 
 </div>
+
+
+
+  <!-- TAB: OLO MELDING BODEMENERGIE -->
+  <div id="tab-olo" class="tab-content">
+    <div style="display:grid; grid-template-columns:1fr 420px; gap:20px; align-items:start;">
+      <div>
+        <div class="panel">
+          <h2>OLO melding bodemenergie</h2>
+          <div class="btn-group" style="margin-top:0; margin-bottom:14px;">
+            <button class="btn btn-primary btn-sm" onclick="prefillOloFromBoorApp()">📋 Overnemen uit BoorApp</button>
+            <button class="btn btn-success btn-sm" onclick="downloadOloGegevensPdf()">📄 Gegevens systeem PDF</button>
+            <button class="btn btn-primary btn-sm" onclick="downloadOloBijlagenPdf()" style="background:#2d7d46;">📎 Bijlagen PDF</button>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group"><label>Projectnummer</label><input type="text" id="olo-projectnr" placeholder="GR123-2026-001"></div>
+            <div class="form-group"><label>Planning start</label><input type="date" id="olo-planning"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Opdrachtgever / project</label><input type="text" id="olo-projectnaam" placeholder="Pomp woonhuis extra"></div>
+            <div class="form-group"><label>Locatie</label><input type="text" id="olo-locatie" placeholder="Adres boorlocatie"></div>
+          </div>
+
+          <h2 style="margin-top:18px;">Gegevens systeem</h2>
+          <div class="form-row">
+            <div class="form-group"><label>Bodemzijdig vermogen (kW)</label><input type="number" id="olo-vermogen" step="0.1"></div>
+            <div class="form-group"><label>Diepte systeem (m)</label><input type="number" id="olo-diepte" step="1"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Warmtevraag (MWh)</label><input type="number" id="olo-warmte" step="0.1"></div>
+            <div class="form-group"><label>Koudevraag (MWh)</label><input type="number" id="olo-koude" step="0.1"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Aantal lussen / boorpunten</label><input type="number" id="olo-lussen" step="1"></div>
+            <div class="form-group"><label>Totale luslengte (m)</label><input type="number" id="olo-luslengte" step="1"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Min. temperatuur (°C)</label><input type="number" id="olo-mintemp" value="-3" step="0.1"></div>
+            <div class="form-group"><label>Max. temperatuur (°C)</label><input type="number" id="olo-maxtemp" value="30" step="0.1"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Individueel systeem</label><select id="olo-individueel"><option>Ja</option><option>Nee</option></select></div>
+            <div class="form-group"><label>Type verticaal systeem</label><select id="olo-verticaal"><option>Ja</option><option>Nee</option></select></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Woningbouw niet gestapeld</label><select id="olo-nietgestapeld"><option>Ja</option><option>Nee</option></select></div>
+            <div class="form-group"><label>Woningbouw gestapeld</label><select id="olo-gestapeld"><option>Nee</option><option>Ja</option></select></div>
+          </div>
+
+          <h2 style="margin-top:18px;">Coördinaten</h2>
+          <div class="form-row">
+            <div class="form-group"><label>Middelpunt systeem RD X</label><input type="number" id="olo-rdx" step="0.01"></div>
+            <div class="form-group"><label>Middelpunt systeem RD Y</label><input type="number" id="olo-rdy" step="0.01"></div>
+          </div>
+          <div class="form-row full">
+            <div class="form-group"><label>Boorpunten / coördinaten</label><textarea id="olo-boorpunten" placeholder="Bijv. B01: X 123456, Y 456789&#10;B02: X 123466, Y 456799"></textarea></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel">
+          <h2>Bijlagen voor melding</h2>
+          <div style="font-size:13px; line-height:1.6; color:#555; margin-bottom:12px;">
+            Bundel voor OLO: gegevens systeem + coördinaten + boorpunttekening. SPF-verklaring van de klant blijft losse bijlage.
+          </div>
+          <div id="olo-tekening-drop" ondrop="handleOloTekeningDrop(event)" ondragover="event.preventDefault(); this.style.borderColor='#4da6ff'; this.style.background='#eef6ff';" ondragleave="this.style.borderColor='#d0d5dd'; this.style.background='#f8f9fb';" style="border:2px dashed #d0d5dd; border-radius:8px; padding:18px; text-align:center; background:#f8f9fb; cursor:pointer;" onclick="document.getElementById('olo-tekening-file').click()">
+            <div style="font-size:28px; margin-bottom:6px;">📎</div>
+            <div style="font-weight:700; color:#1e3a5f;">Sleep tekening uit Boorpunt hierheen</div>
+            <div style="font-size:12px; color:#667085; margin-top:4px;">PDF of afbeelding. Coördinaten worden waar mogelijk uit PDF-tekst gelezen.</div>
+          </div>
+          <input type="file" id="olo-tekening-file" accept="application/pdf,image/*" style="display:none" onchange="handleOloTekeningSelect(event)">
+          <div id="olo-tekening-preview" style="margin-top:12px;"></div>
+          <div class="btn-group">
+            <button class="btn btn-danger btn-sm" onclick="removeOloTekening()">Tekening wissen</button>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:20px;">
+          <h2>Checklist OLO</h2>
+          <ul style="font-size:13px; line-height:1.8; padding-left:18px; color:#555;">
+            <li>SPF-verklaring klant</li>
+            <li>Gegevens systeem PDF</li>
+            <li>Tekening + coördinaten PDF</li>
+            <li>Middelpunt systeem RD-coördinaat</li>
+            <li>Coördinaten boorpunten</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
 
 <!-- MODAL: KLANT TOEVOEGEN/BEWERKEN -->
 <div class="modal-overlay" id="klant-modal">
