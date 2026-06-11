@@ -62,12 +62,25 @@ function normDropboxName(value) {
   return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
+function makeDropboxProjectRef(kenmerk, locatie) {
+  var nr = cleanDropboxPart(kenmerk, 'Zonder projectnummer');
+  var loc = cleanDropboxPart(locatie, '');
+  return loc ? (nr + ' - ' + loc) : nr;
+}
+
 function buildDropboxProjectFolder(projectnr) {
-  var nummer = cleanDropboxPart(projectnr || getDropboxFieldValue(['f-kenmerk', 'pva-projectnr', 'oplever-projectnr', 'wb-kenmerk', 'olo-projectnr']), 'Zonder projectnummer');
   var locatie = cleanDropboxPart(getDropboxFieldValue(['f-locatie', 'pva-locatie', 'oplever-locatie', 'olo-locatie']), '');
-  if (!locatie) return nummer;
-  if (normDropboxName(nummer).indexOf(normDropboxName(locatie)) !== -1) return nummer;
-  return nummer + ' - ' + locatie;
+  var raw = cleanDropboxPart(projectnr || getDropboxFieldValue(['f-kenmerk', 'pva-projectnr', 'oplever-projectnr', 'wb-kenmerk', 'olo-projectnr']), 'Zonder projectnummer');
+  if (!locatie) return raw;
+
+  var rawNorm = normDropboxName(raw);
+  var locNorm = normDropboxName(locatie);
+  if (rawNorm.indexOf(locNorm) !== -1) {
+    var locatieStart = raw.toLowerCase().lastIndexOf(locatie.toLowerCase());
+    var nr = locatieStart > 0 ? raw.slice(0, locatieStart).replace(/[\s-]+$/g, '') : raw;
+    return makeDropboxProjectRef(nr || raw, locatie);
+  }
+  return makeDropboxProjectRef(raw, locatie);
 }
 
 function getDropboxDocFolder(docType) {
@@ -1026,7 +1039,7 @@ function downloadWKOPdf() {
   if (!wkoKenmerk) try { wkoKenmerk = (document.getElementById('pva-projectnr')?.value || '').trim(); } catch(e) {}
   var wkoLocatie = '';
   try { wkoLocatie = (document.getElementById('f-locatie')?.value || '').trim(); } catch(e) {}
-  var wkoProjectNr = ((wkoKenmerk || '') + (wkoLocatie ? '-' + wkoLocatie : '')).trim();
+  var wkoProjectNr = makeDropboxProjectRef(wkoKenmerk || '', wkoLocatie || '');
 
   if (wkoKlant && wkoProjectNr) {
     uploadToDropbox(pdf, filename, wkoKlant, wkoProjectNr, 'WKO_Rapport');
@@ -2627,7 +2640,7 @@ function generatePDF() {
 
   const filename = `Offerte_${d.kenmerk || 'draft'}_${d.klantNaam || 'klant'}.pdf`.replace(/\s+/g, '_');
   doc.save(filename);
-  const offerteProject = ((d.kenmerk || '') + (d.locatie ? '-' + d.locatie : '')).trim() || 'draft';
+  const offerteProject = makeDropboxProjectRef(d.kenmerk || 'draft', d.locatie || '');
   uploadToDropbox(doc, filename, d.klantNaam || '', offerteProject, 'Offerte');
 }
 
@@ -3318,7 +3331,7 @@ function generatePvaPDF() {
 
   const filename = `PvA_${p.projectnr || 'draft'}_${p.klant || ''}.pdf`.replace(/[^a-zA-Z0-9_.-]/g, '_');
   pdf.save(filename);
-  var pvaProject = ((p.projectnr || '') + (p.locatie ? '-' + p.locatie : '')).trim() || 'draft';
+  var pvaProject = makeDropboxProjectRef(p.projectnr || 'draft', p.locatie || '');
   uploadToDropbox(pdf, filename, p.klant || '', pvaProject, 'PvA');
 }
 
@@ -4240,7 +4253,7 @@ function generateOpleverPDF() {
   pdf.save(filename);
 
   // Upload naar Dropbox
-  const oplProject = ((p.projectnr || '') + (p.locatie ? '-' + p.locatie : '')).trim() || 'draft';
+  const oplProject = makeDropboxProjectRef(p.projectnr || 'draft', p.locatie || '');
   uploadToDropbox(pdf, filename, p.klant || '', oplProject, 'Opleverrapport');
 }
 
@@ -4574,6 +4587,6 @@ async function generateWerkbonPDF() {
   filename = filename.replace(/\s+/g, '_');
   doc.save(filename);
 
-  var wbProject = ((kenmerk || '') + (locatie ? '-' + locatie : '')).trim() || 'draft';
+  var wbProject = makeDropboxProjectRef(kenmerk || 'draft', locatie || '');
   uploadToDropbox(doc, filename, klant || '', wbProject, 'Werkbon');
 }
