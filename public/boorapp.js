@@ -91,7 +91,7 @@ async function uploadToDropbox(pdfDoc, filename, klant, projectnr, docType) {
   try {
     console.log('Dropbox upload:', {klant, projectnr, docType, filename});
     var pdfBase64 = pdfDoc.output('datauristring').split(',')[1];
-    var klantFolder = cleanDropboxPart(klant || getDropboxFieldValue(['f-klant', 'pva-klant', 'oplever-klant', 'wb-bedrijf', 'olo-projectnaam']), 'Zonder klant');
+    var klantFolder = cleanDropboxPart(klant || getDropboxFieldValue(['f-klant', 'pva-klant', 'oplever-klant', 'wb-bedrijf']), 'Zonder klant');
     var projectFolder = buildDropboxProjectFolder(projectnr);
     var docFolder = getDropboxDocFolder(docType);
     var projectRoot = DROPBOX_BASE_PROJECT_PATH + '/' + klantFolder + '/' + projectFolder;
@@ -1407,7 +1407,7 @@ function downloadOloGegevensPdf() {
   if (d.boorpunten) y = addBoorpuntenTable(pdf, d.boorpunten, y, 'Boorpunten');
   const filename = makeOloFilename('OLO_Gegevens_systeem', d);
   pdf.save(filename);
-  uploadToDropbox(pdf, filename, d.projectnaam || '', d.projectnr || d.locatie || 'OLO', 'OLO melding');
+  uploadToDropbox(pdf, filename, '', d.projectnr || d.locatie || 'OLO', 'OLO melding');
 }
 
 function addTekeningPagesToPdf(pdf, drawing) {
@@ -1439,7 +1439,7 @@ function downloadOloBijlagenPdf() {
   addTekeningPagesToPdf(pdf, oloTekening);
   const filename = makeOloFilename('OLO_Bijlagen', d);
   pdf.save(filename);
-  uploadToDropbox(pdf, filename, d.projectnaam || '', d.projectnr || d.locatie || 'OLO', 'OLO melding');
+  uploadToDropbox(pdf, filename, '', d.projectnr || d.locatie || 'OLO', 'OLO melding');
 }
 
 // ============================================================
