@@ -17,25 +17,82 @@ function addSignature(pdf, x, y, w, h) {
 // ============================================================
 // DROPBOX AUTO-SAVE
 // ============================================================
+var DROPBOX_BASE_PROJECT_PATH = '/werkmap/Offerte map';
+var DROPBOX_DOC_FOLDER_MAP = {
+  'Offerte': 'Offerte',
+  'PvA': 'Plan van aanpak',
+  'Plan van aanpak': 'Plan van aanpak',
+  'WKO_Rapport': 'WKO Tool',
+  'WKO Rapport': 'WKO Tool',
+  'OLO melding': 'OLO',
+  'Opleverrapport': 'Oplever rapportage',
+  'Oplever rapportage': 'Oplever rapportage',
+  'KLIC': 'Klic',
+  'Klic': 'Klic'
+};
+
+function cleanDropboxPart(value, fallback) {
+  return String(value || fallback || '')
+    .normalize('NFKC')
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/[. ]+$/g, '')
+    .trim()
+    .slice(0, 120) || fallback;
+}
+
+function getDropboxFieldValue(ids) {
+  for (var i = 0; i < ids.length; i++) {
+    var el = document.getElementById(ids[i]);
+    if (!el || !el.value || !String(el.value).trim()) continue;
+    if (el.tagName === 'SELECT' && el.selectedOptions && el.selectedOptions[0]) {
+      var txt = String(el.selectedOptions[0].textContent || '').trim();
+      if (txt && txt.indexOf('--') !== 0 && txt.indexOf('+ Nieuwe') !== 0) return txt;
+    }
+    return String(el.value).trim();
+  }
+  return '';
+}
+
+function normDropboxName(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function buildDropboxProjectFolder(projectnr) {
+  var nummer = cleanDropboxPart(projectnr || getDropboxFieldValue(['f-kenmerk', 'pva-projectnr', 'oplever-projectnr', 'wb-kenmerk', 'olo-projectnr']), 'Zonder projectnummer');
+  var locatie = cleanDropboxPart(getDropboxFieldValue(['f-locatie', 'pva-locatie', 'oplever-locatie', 'olo-locatie']), '');
+  if (!locatie) return nummer;
+  if (normDropboxName(nummer).indexOf(normDropboxName(locatie)) !== -1) return nummer;
+  return nummer + ' - ' + locatie;
+}
+
+function getDropboxDocFolder(docType) {
+  return DROPBOX_DOC_FOLDER_MAP[docType] || cleanDropboxPart(docType, 'Documenten');
+}
+
 async function uploadToDropbox(pdfDoc, filename, klant, projectnr, docType) {
   try {
     console.log('Dropbox upload:', {klant, projectnr, docType, filename});
     var pdfBase64 = pdfDoc.output('datauristring').split(',')[1];
-    var klantFolder = (klant || 'Zonder_klant').replace(/[^a-zA-Z0-9 _-]/g, '').trim();
-    var projectFolder = (projectnr || 'Zonder_projectnummer').replace(/[^a-zA-Z0-9 _-]/g, '').trim();
-    var folderPath = '/Ground Research/' + klantFolder + '/' + projectFolder + '/' + docType;
+    var klantFolder = cleanDropboxPart(klant || getDropboxFieldValue(['f-klant', 'pva-klant', 'oplever-klant', 'wb-bedrijf', 'olo-projectnaam']), 'Zonder klant');
+    var projectFolder = buildDropboxProjectFolder(projectnr);
+    var docFolder = getDropboxDocFolder(docType);
+    var projectRoot = DROPBOX_BASE_PROJECT_PATH + '/' + klantFolder + '/' + projectFolder;
+    var folderPath = projectRoot + '/' + docFolder;
     var dropboxPath = folderPath + '/' + filename;
-    // Eerst map aanmaken
+
+    // Eerst volledige standaard projectmapstructuur aanmaken
     await fetch('/api/dropbox/upload', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ folderPath: folderPath })
+      body: JSON.stringify({ folderPath: projectRoot, createProjectStructure: true })
     });
-    // Dan bestand uploaden
+
+    // Dan bestand uploaden naar de juiste submap
     var response = await fetch('/api/dropbox/upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filePath: dropboxPath, fileContent: pdfBase64, fileName: filename })
+      body: JSON.stringify({ filePath: dropboxPath, fileContent: pdfBase64, fileName: filename, projectRoot: projectRoot })
     });
     var result = await response.json();
     if (result.success) {
