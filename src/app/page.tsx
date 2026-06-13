@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState, useRef, memo } from 'react';
 import { supabase, loadUserData, saveUserData, saveAllUserData, DATA_KEYS } from '@/lib/supabase';
@@ -289,6 +289,28 @@ tr:hover { background: #eef3fa; }
 .offerte-actions { display: flex; gap: 6px; margin-left: 12px; }
 @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
 
+.dashboard-controls { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
+.dashboard-controls .form-group { min-width:140px; margin-bottom:0; }
+.dash-grid { display:grid; grid-template-columns:repeat(4, minmax(150px, 1fr)); gap:12px; margin-bottom:14px; }
+.dash-card { background:white; border:1px solid #d8e0ea; border-radius:10px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+.dash-label { font-size:11px; color:#667085; text-transform:uppercase; letter-spacing:.5px; font-weight:700; margin-bottom:6px; }
+.dash-value { font-size:24px; font-weight:800; color:#1e3a5f; line-height:1.1; }
+.dash-sub { font-size:12px; color:#667085; margin-top:4px; }
+.dash-layout { display:grid; grid-template-columns:1.35fr .85fr; gap:12px; }
+.dash-bars { display:flex; flex-direction:column; gap:7px; }
+.dash-bar-row { display:grid; grid-template-columns:42px 1fr 110px; gap:8px; align-items:center; font-size:12px; }
+.dash-bar-track { height:18px; background:#edf3fa; border-radius:999px; overflow:hidden; border:1px solid #d8e5f2; }
+.dash-bar-fill { height:100%; background:linear-gradient(90deg, #1e3a5f, #4da6ff); border-radius:999px; min-width:2px; }
+.dash-list { display:flex; flex-direction:column; gap:8px; }
+.dash-list-row { display:grid; grid-template-columns:1fr auto; gap:8px; padding:8px 0; border-bottom:1px solid #e8ecf1; font-size:13px; }
+.dash-list-row strong { color:#333; }
+.dash-table { width:100%; border-collapse:collapse; font-size:12px; }
+.dash-table th { text-align:left; padding:8px 10px; background:#1e3a5f; color:#fff; font-size:11px; text-transform:uppercase; }
+.dash-table td { padding:8px 10px; border-bottom:1px solid #e8ecf1; }
+.dash-table .num { text-align:right; font-weight:700; }
+@media(max-width:850px) { .dash-grid { grid-template-columns:1fr 1fr; } .dash-layout { grid-template-columns:1fr; } }
+@media(max-width:520px) { .dash-grid { grid-template-columns:1fr; } .dash-bar-row { grid-template-columns:36px 1fr 82px; } .dash-value { font-size:21px; } }
+
 `;
 
 // ============= HTML =============
@@ -307,6 +329,7 @@ const BOORAPP_HTML = `
   <div class="tab active" onclick="switchTab('offerte')">Nieuwe Offerte</div>
   <div class="tab" onclick="switchTab('klanten')">Klantenlijst</div>
   <div class="tab" onclick="switchTab('opgeslagen')">Opgeslagen Offertes</div>
+  <div class="tab" onclick="switchTab('dashboard')">Dashboard</div>
   <div class="tab" onclick="switchTab('pva')">Plan van Aanpak</div>
   <div class="tab" onclick="switchTab('oplever')">Opleverrapport</div>
   <div class="tab" onclick="switchTab('werkbon')">Werkbon</div>
@@ -514,6 +537,56 @@ const BOORAPP_HTML = `
         </label>
       </div>
       <div id="offertes-list"></div>
+    </div>
+  </div>
+
+
+  <!-- TAB: DASHBOARD -->
+  <div id="tab-dashboard" class="tab-content">
+    <div class="panel" style="margin-bottom:16px;">
+      <h2>Offerte Dashboard</h2>
+      <div class="dashboard-controls">
+        <div class="form-group">
+          <label>Periode</label>
+          <select id="dash-period" onchange="renderDashboard()">
+            <option value="month">Deze maand</option>
+            <option value="quarter">Dit kwartaal</option>
+            <option value="half">Dit half jaar</option>
+            <option value="year" selected>Dit jaar</option>
+            <option value="all">Alles</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Jaar</label>
+          <input id="dash-year" type="number" min="2020" max="2100" onchange="renderDashboard()">
+        </div>
+        <div class="form-group">
+          <label>Archief</label>
+          <select id="dash-archive" onchange="renderDashboard()">
+            <option value="active" selected>Alleen actief</option>
+            <option value="all">Inclusief archief</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="renderDashboard()">↻ Vernieuwen</button>
+      </div>
+      <div class="mini-note" style="margin-top:8px;">Bedragen zijn ex. btw op basis van opgeslagen BoorApp-offertes.</div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="dash-card"><div class="dash-label">Totaal offertewaarde</div><div class="dash-value" id="dash-total">€ 0</div><div class="dash-sub" id="dash-period-label">—</div></div>
+      <div class="dash-card"><div class="dash-label">Aantal offertes</div><div class="dash-value" id="dash-count">0</div><div class="dash-sub">opgeslagen offertes</div></div>
+      <div class="dash-card"><div class="dash-label">Gemiddelde waarde</div><div class="dash-value" id="dash-avg">€ 0</div><div class="dash-sub">per offerte</div></div>
+      <div class="dash-card"><div class="dash-label">Hoogste offerte</div><div class="dash-value" id="dash-max">€ 0</div><div class="dash-sub" id="dash-max-name">—</div></div>
+    </div>
+
+    <div class="dash-layout" style="margin-bottom:16px;">
+      <div class="panel"><h2>Waarde per maand</h2><div class="dash-bars" id="dash-monthly-bars"></div></div>
+      <div class="panel"><h2>Top klanten</h2><div class="dash-list" id="dash-top-customers"></div></div>
+    </div>
+
+    <div class="panel">
+      <h2>Offertes in selectie</h2>
+      <div id="dash-recent"></div>
     </div>
   </div>
 

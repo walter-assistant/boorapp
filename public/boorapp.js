@@ -1064,13 +1064,14 @@ function parseEur(s) {
 // ============================================================
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach((t, i) => {
-    const tabs = ['offerte', 'klanten', 'opgeslagen', 'pva', 'oplever', 'werkbon', 'olo'];
+    const tabs = ['offerte', 'klanten', 'opgeslagen', 'dashboard', 'pva', 'oplever', 'werkbon', 'olo'];
     t.classList.toggle('active', tabs[i] === name);
   });
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   if (name === 'klanten') renderKlanten();
   if (name === 'opgeslagen') renderOffertes();
+  if (name === 'dashboard') renderDashboard();
   if (name === 'offerte') populateKlantDropdown();
   if (name === 'pva') initPvaTab();
   if (name === 'oplever') initOpleverTab();
@@ -2129,6 +2130,7 @@ function saveOfferte(silent) {
     offertes.unshift(data);
   }
   saveOffertes(offertes);
+  if (document.getElementById('tab-dashboard')?.classList.contains('active')) renderDashboard();
   if (!silent) alert('Offerte opgeslagen!');
   return true;
 }
@@ -2244,6 +2246,7 @@ function archiveOfferte(idx) {
     offertes[idx].archivedAt = new Date().toISOString();
     saveOffertes(offertes);
     renderOffertes();
+    if (document.getElementById('tab-dashboard')?.classList.contains('active')) renderDashboard();
   }
 }
 
@@ -2254,6 +2257,7 @@ function restoreOfferte(idx) {
     delete offertes[idx].archivedAt;
     saveOffertes(offertes);
     renderOffertes();
+    if (document.getElementById('tab-dashboard')?.classList.contains('active')) renderDashboard();
   }
 }
 
@@ -2263,11 +2267,110 @@ function deleteOfferte(idx) {
   offertes.splice(idx, 1);
   saveOffertes(offertes);
   renderOffertes();
+  if (document.getElementById('tab-dashboard')?.classList.contains('active')) renderDashboard();
 }
 
 function pdfFromSaved(idx) {
   loadOfferte(idx);
   setTimeout(() => generatePDF(), 200);
+}
+
+
+// ============================================================
+// DASHBOARD — OFFERTE-INZICHTEN
+// ============================================================
+function dashMoney(n) {
+  return '€ ' + (Number(n) || 0).toLocaleString('nl-NL', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+function dashDate(o) {
+  const raw = o?.datum || (o?.savedAt ? String(o.savedAt).substring(0, 10) : '');
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d;
+}
+function dashTotal(o) {
+  const n = Number(o?.total);
+  if (Number.isFinite(n) && n > 0) return n;
+  const norm = normalizeOfferteData(o || {});
+  let total = 0;
+  if (norm.costs && typeof norm.costs === 'object') Object.values(norm.costs).forEach(v => { total += Number(v) || 0; });
+  (norm.vrijeRegels || []).forEach(r => { total += Number(r.bedrag) || 0; });
+  return total;
+}
+function dashCustomer(o) { return o?.klantNaam || 'Onbekend'; }
+function dashTitle(o) { return [o?.kenmerk, o?.klantNaam, o?.locatie].filter(Boolean).join(' — ') || 'Naamloze offerte'; }
+function dashRows() {
+  const yearEl = document.getElementById('dash-year');
+  if (yearEl && !yearEl.value) yearEl.value = new Date().getFullYear();
+  const period = document.getElementById('dash-period')?.value || 'year';
+  const archive = document.getElementById('dash-archive')?.value || 'active';
+  const year = Number(yearEl?.value || new Date().getFullYear());
+  const now = new Date();
+  const currentMonth = now.getFullYear() === year ? now.getMonth() : 0;
+  const currentQuarter = Math.floor(currentMonth / 3);
+  const currentHalf = currentMonth < 6 ? 0 : 1;
+  return getOffertes().map(o => ({ o, date: dashDate(o), total: dashTotal(o) }))
+    .filter(r => r.date && r.total > 0)
+    .filter(r => archive === 'all' ? true : !r.o.archived)
+    .filter(r => {
+      if (period === 'all') return true;
+      if (r.date.getFullYear() !== year) return false;
+      if (period === 'month') return r.date.getMonth() === currentMonth;
+      if (period === 'quarter') return Math.floor(r.date.getMonth() / 3) === currentQuarter;
+      if (period === 'half') return (r.date.getMonth() < 6 ? 0 : 1) === currentHalf;
+      return true;
+    });
+}
+function renderDashboard() {
+  const root = document.getElementById('tab-dashboard');
+  if (!root) return;
+  const rows = dashRows();
+  const total = rows.reduce((s, r) => s + r.total, 0);
+  const count = rows.length;
+  const avg = count ? total / count : 0;
+  const maxRow = rows.slice().sort((a, b) => b.total - a.total)[0];
+  const period = document.getElementById('dash-period')?.value || 'year';
+  const periodNames = { month:'deze maand', quarter:'dit kwartaal', half:'dit half jaar', year:'dit jaar', all:'alle jaren' };
+  const set = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+  set('dash-total', dashMoney(total));
+  set('dash-count', String(count));
+  set('dash-avg', dashMoney(avg));
+  set('dash-max', dashMoney(maxRow?.total || 0));
+  set('dash-max-name', maxRow ? dashTitle(maxRow.o).slice(0, 48) : '—');
+  set('dash-period-label', periodNames[period] || 'selectie');
+
+  const year = Number(document.getElementById('dash-year')?.value || new Date().getFullYear());
+  const archive = document.getElementById('dash-archive')?.value || 'active';
+  const months = Array.from({ length: 12 }, (_, i) => ({ i, label: ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'][i], total:0, count:0 }));
+  getOffertes().map(o => ({ o, date: dashDate(o), total: dashTotal(o) }))
+    .filter(r => r.date && r.date.getFullYear() === year && r.total > 0)
+    .filter(r => archive === 'all' ? true : !r.o.archived)
+    .forEach(r => { months[r.date.getMonth()].total += r.total; months[r.date.getMonth()].count += 1; });
+  const maxMonth = Math.max(1, ...months.map(m => m.total));
+  const bars = document.getElementById('dash-monthly-bars');
+  if (bars) bars.innerHTML = months.map(m => `
+    <div class="dash-bar-row">
+      <div>${m.label}</div>
+      <div class="dash-bar-track"><div class="dash-bar-fill" style="width:${Math.max(2, (m.total / maxMonth) * 100)}%"></div></div>
+      <div style="text-align:right">${dashMoney(m.total)} <span style="color:#667085">(${m.count})</span></div>
+    </div>`).join('');
+
+  const customerMap = new Map();
+  rows.forEach(r => {
+    const key = dashCustomer(r.o);
+    const cur = customerMap.get(key) || { total:0, count:0 };
+    cur.total += r.total; cur.count += 1; customerMap.set(key, cur);
+  });
+  const top = Array.from(customerMap.entries()).sort((a,b) => b[1].total - a[1].total).slice(0, 8);
+  const topEl = document.getElementById('dash-top-customers');
+  if (topEl) topEl.innerHTML = top.length ? top.map(([name, v]) => `
+    <div class="dash-list-row"><strong>${esc(name)}</strong><span>${dashMoney(v.total)} <small style="color:#667085">(${v.count})</small></span></div>`).join('') : '<div class="empty-state"><p>Nog geen offertes in deze selectie.</p></div>';
+
+  const recent = rows.slice().sort((a,b) => b.date - a.date).slice(0, 30);
+  const recentEl = document.getElementById('dash-recent');
+  if (recentEl) recentEl.innerHTML = recent.length ? `
+    <table class="dash-table"><thead><tr><th>Datum</th><th>Kenmerk</th><th>Klant</th><th>Locatie</th><th class="num">Bedrag ex.</th></tr></thead><tbody>
+    ${recent.map(r => `<tr><td>${formatDate(r.o.datum || r.o.savedAt)}</td><td>${esc(r.o.kenmerk || '')}</td><td>${esc(dashCustomer(r.o))}</td><td>${esc(r.o.locatie || '')}</td><td class="num">${dashMoney(r.total)}</td></tr>`).join('')}
+    </tbody></table>` : '<div class="empty-state"><p>Nog geen offertes in deze selectie.</p></div>';
 }
 
 // ============================================================
