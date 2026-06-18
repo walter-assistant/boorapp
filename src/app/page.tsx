@@ -577,6 +577,8 @@ const BOORAPP_HTML = `
       <div class="dash-card"><div class="dash-label">Aantal offertes</div><div class="dash-value" id="dash-count">0</div><div class="dash-sub">opgeslagen offertes</div></div>
       <div class="dash-card"><div class="dash-label">Gemiddelde waarde</div><div class="dash-value" id="dash-avg">€ 0</div><div class="dash-sub">per offerte</div></div>
       <div class="dash-card"><div class="dash-label">Hoogste offerte</div><div class="dash-value" id="dash-max">€ 0</div><div class="dash-sub" id="dash-max-name">—</div></div>
+      <div class="dash-card"><div class="dash-label">Opdracht geworden</div><div class="dash-value" id="dash-won-count">0</div><div class="dash-sub" id="dash-won-rate">0% conversie</div></div>
+      <div class="dash-card"><div class="dash-label">Waarde opdrachten</div><div class="dash-value" id="dash-won-value">€ 0</div><div class="dash-sub">op basis van werkbonnen</div></div>
     </div>
 
     <div class="dash-layout" style="margin-bottom:16px;">
@@ -629,6 +631,11 @@ const BOORAPP_HTML = `
               <label>Ploeg 2</label>
               <div id="pva-ploeg2" style="display:flex; flex-direction:column; gap:4px;"></div>
             </div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="addPvaPersoneel()">+ Personeel toevoegen</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="resetPvaPersoneel()" style="color:#777;border-color:#ccc;">Standaardlijst herstellen</button>
+            <span style="font-size:12px;color:#777;">Wordt bewaard voor nieuwe offertes op deze computer.</span>
           </div>
         </div>
 

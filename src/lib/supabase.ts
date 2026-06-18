@@ -6,7 +6,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publish
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Data keys that map to the original localStorage keys
-export const DATA_KEYS = ['gr_klanten', 'gr_offertes'] as const;
+export const DATA_KEYS = ['gr_klanten', 'gr_offertes', 'boorapp_pva_personeel'] as const;
 
 export type DataKey = typeof DATA_KEYS[number];
 

@@ -1073,10 +1073,24 @@ function switchTab(name) {
   if (name === 'opgeslagen') renderOffertes();
   if (name === 'dashboard') renderDashboard();
   if (name === 'offerte') populateKlantDropdown();
-  if (name === 'pva') initPvaTab();
-  if (name === 'oplever') initOpleverTab();
-  if (name === 'werkbon') initWerkbonTab();
-  if (name === 'olo') initOloTab();
+  if (name === 'pva') {
+    initPvaTab();
+    // Altijd opnieuw de projectgegevens uit de geopende offerte halen.
+    // Anders kan oude autosave-data van een ander project zichtbaar blijven.
+    prefillPvaFromOfferte();
+  }
+  if (name === 'oplever') {
+    initOpleverTab();
+    syncOpleverFromCurrentOfferte();
+  }
+  if (name === 'werkbon') {
+    initWerkbonTab();
+    syncWerkbonFromCurrentOfferte();
+  }
+  if (name === 'olo') {
+    initOloTab();
+    syncOloFromCurrentOfferte();
+  }
 }
 
 
@@ -1096,8 +1110,22 @@ function initOloTab() {
     tab.addEventListener('input', saveOloState);
     tab.addEventListener('change', saveOloState);
   }
-  if (!document.getElementById('olo-projectnr')?.value) prefillOloFromBoorApp(false);
+  syncOloFromCurrentOfferte();
   oloTabInited = true;
+}
+
+function clearOloProjectFields() {
+  ['olo-projectnr','olo-projectnaam','olo-locatie','olo-vermogen','olo-warmte','olo-koude','olo-diepte','olo-lussen','olo-luslengte','olo-rdx','olo-rdy','olo-boorpunten'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+}
+
+function syncOloFromCurrentOfferte() {
+  const currentKenmerk = (document.getElementById('f-kenmerk')?.value || '').trim();
+  const oloKenmerk = (document.getElementById('olo-projectnr')?.value || '').trim();
+  if (currentKenmerk && oloKenmerk && currentKenmerk !== oloKenmerk) clearOloProjectFields();
+  prefillOloFromBoorApp(false);
 }
 
 function valById(id) { return document.getElementById(id)?.value || ''; }
@@ -1219,13 +1247,16 @@ function gatherOloData() {
 function saveOloState() {
   clearTimeout(_oloSaveTimer);
   _oloSaveTimer = setTimeout(() => {
-    try { localStorage.setItem(OLO_SAVE_KEY, JSON.stringify({ data: gatherOloData(), tekening: oloTekening })); } catch(e) {}
+    try { localStorage.setItem(OLO_SAVE_KEY, JSON.stringify({ projectnr: valById('olo-projectnr'), data: gatherOloData(), tekening: oloTekening })); } catch(e) {}
   }, 250);
 }
 
 function restoreOloState() {
   try {
     const saved = JSON.parse(localStorage.getItem(OLO_SAVE_KEY) || '{}');
+    const currentKenmerk = (document.getElementById('f-kenmerk')?.value || '').trim();
+    const savedKenmerk = (saved.projectnr || saved.data?.projectnr || '').trim();
+    if (currentKenmerk && savedKenmerk && currentKenmerk !== savedKenmerk) return;
     if (saved.data) Object.entries(saved.data).forEach(([k, v]) => setVal('olo-' + k, v));
     if (saved.tekening) { oloTekening = saved.tekening; renderOloTekeningPreview(); }
   } catch(e) {}
@@ -2112,6 +2143,7 @@ function nieuweOfferteBA() {
   renderClusters();
   renderVrijeRegels();
   calc();
+  try { autoSaveAll(); } catch(e) {}
   switchTab('offerte');
 }
 
@@ -2124,6 +2156,7 @@ function saveOfferte(silent) {
   var existing = offertes.findIndex(function(o) { return o.kenmerk === data.kenmerk; });
   if (existing >= 0) {
     data.id = offertes[existing].id || Date.now();
+    if (offertes[existing].werkbon) data.werkbon = offertes[existing].werkbon;
     offertes[existing] = data;
   } else {
     data.id = Date.now();
@@ -2235,6 +2268,7 @@ function loadOfferte(idx) {
   renderClusters();
   renderVrijeRegels();
   calc();
+  try { autoSaveAll(); } catch(e) {}
   switchTab('offerte');
 }
 
@@ -2298,6 +2332,7 @@ function dashTotal(o) {
 }
 function dashCustomer(o) { return o?.klantNaam || 'Onbekend'; }
 function dashTitle(o) { return [o?.kenmerk, o?.klantNaam, o?.locatie].filter(Boolean).join(' — ') || 'Naamloze offerte'; }
+function dashIsWon(o) { return !!(o && o.werkbon && (o.werkbon.opdracht || o.werkbon.generatedAt || o.werkbon.bedragEx)); }
 function dashRows() {
   const yearEl = document.getElementById('dash-year');
   if (yearEl && !yearEl.value) yearEl.value = new Date().getFullYear();
@@ -2327,6 +2362,10 @@ function renderDashboard() {
   const total = rows.reduce((s, r) => s + r.total, 0);
   const count = rows.length;
   const avg = count ? total / count : 0;
+  const wonRows = rows.filter(r => dashIsWon(r.o));
+  const wonCount = wonRows.length;
+  const wonValue = wonRows.reduce((s, r) => s + r.total, 0);
+  const wonRate = count ? Math.round((wonCount / count) * 100) : 0;
   const maxRow = rows.slice().sort((a, b) => b.total - a.total)[0];
   const period = document.getElementById('dash-period')?.value || 'year';
   const periodNames = { month:'deze maand', quarter:'dit kwartaal', half:'dit half jaar', year:'dit jaar', all:'alle jaren' };
@@ -2336,6 +2375,9 @@ function renderDashboard() {
   set('dash-avg', dashMoney(avg));
   set('dash-max', dashMoney(maxRow?.total || 0));
   set('dash-max-name', maxRow ? dashTitle(maxRow.o).slice(0, 48) : '—');
+  set('dash-won-count', String(wonCount));
+  set('dash-won-rate', wonRate + '% conversie');
+  set('dash-won-value', dashMoney(wonValue));
   set('dash-period-label', periodNames[period] || 'selectie');
 
   const year = Number(document.getElementById('dash-year')?.value || new Date().getFullYear());
@@ -2368,8 +2410,8 @@ function renderDashboard() {
   const recent = rows.slice().sort((a,b) => b.date - a.date).slice(0, 30);
   const recentEl = document.getElementById('dash-recent');
   if (recentEl) recentEl.innerHTML = recent.length ? `
-    <table class="dash-table"><thead><tr><th>Datum</th><th>Kenmerk</th><th>Klant</th><th>Locatie</th><th class="num">Bedrag ex.</th></tr></thead><tbody>
-    ${recent.map(r => `<tr><td>${formatDate(r.o.datum || r.o.savedAt)}</td><td>${esc(r.o.kenmerk || '')}</td><td>${esc(dashCustomer(r.o))}</td><td>${esc(r.o.locatie || '')}</td><td class="num">${dashMoney(r.total)}</td></tr>`).join('')}
+    <table class="dash-table"><thead><tr><th>Datum</th><th>Kenmerk</th><th>Klant</th><th>Locatie</th><th>Status</th><th class="num">Bedrag ex.</th></tr></thead><tbody>
+    ${recent.map(r => `<tr><td>${formatDate(r.o.datum || r.o.savedAt)}</td><td>${esc(r.o.kenmerk || '')}</td><td>${esc(dashCustomer(r.o))}</td><td>${esc(r.o.locatie || '')}</td><td>${dashIsWon(r.o) ? '✅ Opdracht' : 'Offerte'}</td><td class="num">${dashMoney(r.total)}</td></tr>`).join('')}
     </tbody></table>` : '<div class="empty-state"><p>Nog geen offertes in deze selectie.</p></div>';
 }
 
@@ -2920,30 +2962,128 @@ function init() {
 // ============================================================
 // PLAN VAN AANPAK
 // ============================================================
-const PVA_PERSONEEL = [
-  { col: 1, names: ['Sander de Roo', 'Michel Fernandez', 'Steven Dubois', 'Pim Groot', 'Maart-Jan', 'Richard Brink'] },
-  { col: 2, names: ['Jeroen Kipp', 'Mark Boon', 'Thijs Schermer', 'Dion Koopman', 'Edsel Welvaart', 'Anders'] }
-];
+const PVA_PERSONEEL_KEY = 'boorapp_pva_personeel';
+const PVA_PERSONEEL_DEFAULT = ['Sander de Roo', 'Michel Fernandez', 'Steven Dubois', 'Pim Groot', 'Maart-Jan', 'Richard Brink', 'Jeroen Kipp', 'Mark Boon', 'Thijs Schermer', 'Dion Koopman', 'Edsel Welvaart', 'Anders'];
+
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+}
+
+function getPvaPersoneelList() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PVA_PERSONEEL_KEY) || 'null');
+    if (Array.isArray(saved) && saved.length) return saved.map(x => String(x || '').trim()).filter(Boolean);
+  } catch(e) {}
+  return PVA_PERSONEEL_DEFAULT.slice();
+}
+
+function savePvaPersoneelList(list) {
+  const clean = [];
+  (list || []).forEach(name => {
+    name = String(name || '').trim();
+    if (name && !clean.some(x => x.toLowerCase() === name.toLowerCase())) clean.push(name);
+  });
+  const value = clean.length ? clean : PVA_PERSONEEL_DEFAULT;
+  localStorage.setItem(PVA_PERSONEEL_KEY, JSON.stringify(value));
+  if (window.__supabaseSave) {
+    try { window.__supabaseSave(PVA_PERSONEEL_KEY, value); } catch(e) {}
+  }
+}
+
+function renderPvaPersoneelList(checkedNames) {
+  checkedNames = checkedNames || Array.from(document.querySelectorAll('.pva-personeel:checked')).map(cb => cb.value);
+  const andersText = document.querySelector('.pva-personeel-anders')?.value || '';
+  const names = getPvaPersoneelList();
+  const mid = Math.ceil(names.length / 2);
+  [1, 2].forEach(col => {
+    const container = document.getElementById('pva-ploeg' + col);
+    if (container) container.innerHTML = '';
+  });
+  names.forEach((name, idx) => {
+    const col = idx < mid ? 1 : 2;
+    const container = document.getElementById('pva-ploeg' + col);
+    if (!container) return;
+    const lbl = document.createElement('label');
+    lbl.style.cssText = 'display:flex; align-items:center; gap:6px; font-size:13px;';
+    const isAnders = name === 'Anders';
+    const checked = checkedNames.includes(name) ? ' checked' : '';
+    const encodedName = encodeURIComponent(name).replace(/'/g, '%27');
+    const removeBtn = isAnders ? '' : `<button type="button" onclick="removePvaPersoneel('${encodedName}')" title="Verwijderen" style="margin-left:auto; border:0; background:transparent; color:#999; cursor:pointer; font-size:14px; line-height:1;">×</button>`;
+    lbl.innerHTML = `<input type="checkbox" class="pva-personeel" value="${escapeHtml(name)}"${checked}>${isAnders ? '<input type="text" placeholder="Anders..." style="width:120px; padding:3px 6px; border:1px solid #d0d5dd; border-radius:4px; font-size:12px;" class="pva-personeel-anders">' : '<span>' + escapeHtml(name) + '</span>'}${removeBtn}`;
+    container.appendChild(lbl);
+    if (isAnders && andersText) {
+      const input = lbl.querySelector('.pva-personeel-anders');
+      if (input) input.value = andersText;
+    }
+  });
+}
+
+function addPvaPersoneel() {
+  const name = prompt('Naam nieuwe collega / personeelslid:');
+  if (!name || !name.trim()) return;
+  const list = getPvaPersoneelList();
+  const clean = name.trim();
+  if (list.some(x => x.toLowerCase() === clean.toLowerCase())) {
+    alert('Deze naam staat al in de lijst.');
+    return;
+  }
+  const andersIdx = list.indexOf('Anders');
+  if (andersIdx >= 0) list.splice(andersIdx, 0, clean);
+  else list.push(clean);
+  savePvaPersoneelList(list);
+  renderPvaPersoneelList();
+  try { autoSaveAll(); } catch(e) {}
+}
+
+function removePvaPersoneel(encodedName) {
+  const name = decodeURIComponent(encodedName || '');
+  if (!name || name === 'Anders') return;
+  if (!confirm(name + ' verwijderen uit de personeelslijst?')) return;
+  const list = getPvaPersoneelList().filter(x => x !== name);
+  savePvaPersoneelList(list);
+  renderPvaPersoneelList();
+  try { autoSaveAll(); } catch(e) {}
+}
+
+function resetPvaPersoneel() {
+  if (!confirm('Standaard personeelslijst herstellen? Eigen toevoegingen/verwijderingen worden overschreven.')) return;
+  savePvaPersoneelList(PVA_PERSONEEL_DEFAULT);
+  renderPvaPersoneelList();
+  try { autoSaveAll(); } catch(e) {}
+}
 
 let pvaTabInited = false;
 function initPvaTab() {
   if (pvaTabInited) return;
   pvaTabInited = true;
-  for (const col of PVA_PERSONEEL) {
-    const container = document.getElementById('pva-ploeg' + col.col);
-    for (const name of col.names) {
-      const lbl = document.createElement('label');
-      lbl.style.cssText = 'display:flex; align-items:center; gap:6px; font-size:13px;';
-      const isAnders = name === 'Anders';
-      lbl.innerHTML = `<input type="checkbox" class="pva-personeel" value="${name}">${isAnders ? '<input type="text" placeholder="Anders..." style="width:120px; padding:3px 6px; border:1px solid #d0d5dd; border-radius:4px; font-size:12px;" class="pva-personeel-anders">' : name}`;
-      container.appendChild(lbl);
-    }
-  }
-  // Restore saved PvA data (after DOM is built)
-  autoRestoreAll();
+  renderPvaPersoneelList();
+  // Restore alleen dynamische PvA-velden als de autosave bij hetzelfde project hoort.
+  // Voorkomt dat bv. GR123-2026-018 over GR123-2026-005 heen wordt gezet.
+  restorePvaDynamicAutosaveForCurrentProject();
 
-  // Prefill PvA vanuit offerte — NA autorestore zodat offerte-velden gevuld zijn
+  // Prefill PvA vanuit de huidige offerte.
   prefillPvaFromOfferte();
+}
+
+function restorePvaDynamicAutosaveForCurrentProject() {
+  const raw = localStorage.getItem(AUTOSAVE_KEY);
+  if (!raw) return;
+  try {
+    const data = JSON.parse(raw);
+    const currentKenmerk = (document.getElementById('f-kenmerk')?.value || '').trim();
+    const savedKenmerk = (data['f-kenmerk'] || '').trim();
+    if (currentKenmerk && savedKenmerk && currentKenmerk !== savedKenmerk) return;
+    if (data._pvaPersoneel) {
+      document.querySelectorAll('.pva-personeel').forEach(cb => {
+        cb.checked = data._pvaPersoneel.includes(cb.value);
+      });
+    }
+    if (data._pvaAndersText) {
+      document.querySelectorAll('.pva-personeel-anders').forEach((el, i) => {
+        if (data._pvaAndersText[i]) el.value = data._pvaAndersText[i];
+      });
+    }
+  } catch (e) { /* ignore corrupt data */ }
 }
 
 function prefillPvaFromOfferte() {
@@ -3691,9 +3831,25 @@ function initOpleverTab() {
     document.getElementById('tab-oplever').addEventListener('change', saveOpleverState);
     opleverInitDone = true;
   }
+  syncOpleverFromCurrentOfferte();
 }
 
-function copyOfferteToOplever() {
+function syncOpleverFromCurrentOfferte() {
+  const currentKenmerk = (document.getElementById('f-kenmerk')?.value || '').trim();
+  const opleverKenmerk = (document.getElementById('opl-kenmerk')?.value || document.getElementById('opl-projectnr')?.value || '').trim();
+  if (!currentKenmerk) return;
+  // Bij een ander geopend project: projectgegevens direct overschrijven met de actieve offerte.
+  // Project-specifieke bijlagen/foto's worden niet meegenomen vanuit oude autosave.
+  copyOfferteToOplever(false);
+  if (opleverKenmerk && opleverKenmerk !== currentKenmerk) {
+    oplFotos = [];
+    oplTekening = null;
+    renderFotoPreview();
+    renderTekeningPreview();
+  }
+}
+
+function copyOfferteToOplever(showAlert = true) {
   // Kopieer data uit offerte-tab
   const d = gatherOfferteData();
   const firstCluster = d.clusters?.[0] || {};
@@ -3725,7 +3881,8 @@ function copyOfferteToOplever() {
   if (v('pva-olo')) document.getElementById('opl-olo').value = v('pva-olo');
 
   renderBronTabel();
-  alert('Gegevens overgenomen uit offerte/PvA!');
+  saveOpleverState();
+  if (showAlert) alert('Gegevens overgenomen uit offerte/PvA!');
 }
 
 // ============================================================
@@ -3894,6 +4051,7 @@ function saveOpleverState() {
   clearTimeout(_oplSaveTimer);
   _oplSaveTimer = setTimeout(() => {
     const state = {
+      projectnr: document.getElementById('opl-projectnr')?.value || document.getElementById('opl-kenmerk')?.value || '',
       fotos: oplFotos,
       tekening: oplTekening,
       fields: {}
@@ -3920,6 +4078,9 @@ function restoreOpleverState() {
     const raw = localStorage.getItem(OPLEVER_SAVE_KEY);
     if (!raw) return;
     const state = JSON.parse(raw);
+    const currentKenmerk = (document.getElementById('f-kenmerk')?.value || '').trim();
+    const savedKenmerk = (state.projectnr || state.fields?.['opl-projectnr'] || state.fields?.['opl-kenmerk'] || '').trim();
+    if (currentKenmerk && savedKenmerk && currentKenmerk !== savedKenmerk) return;
     // Restore fotos (only those with actual data)
     if (state.fotos) {
       oplFotos = state.fotos.filter(f => f.dataUrl);
@@ -4379,6 +4540,26 @@ function initWerkbonTab() {
     el.addEventListener('input', wbRecalc);
     el.addEventListener('change', wbRecalc);
   }
+  syncWerkbonFromCurrentOfferte();
+}
+
+function syncWerkbonFromCurrentOfferte() {
+  const currentKenmerk = (document.getElementById('f-kenmerk')?.value || '').trim();
+  const wbKenmerk = (document.getElementById('wb-kenmerk')?.value || '').trim();
+  if (!currentKenmerk) return;
+  // Alleen volledig opnieuw vullen als er nog geen werkbon staat of als het een ander project is.
+  // Zo raak je handmatig meer-/minderwerk niet kwijt bij even wegklikken.
+  if (!wbKenmerk || wbKenmerk !== currentKenmerk) {
+    werkbonFromOfferte();
+  } else {
+    // Basisgegevens uit actieve offerte wel fris houden, zonder meerwerk te resetten.
+    var v = function(id) { var el = document.getElementById(id); return el ? el.value : ''; };
+    document.getElementById('wb-kenmerk').value = v('f-kenmerk');
+    document.getElementById('wb-contact').value = v('f-tav');
+    document.getElementById('wb-locatie').value = v('f-locatie');
+    document.getElementById('wb-betreft').value = v('f-betreft');
+    wbRecalc();
+  }
 }
 
 function werkbonFromOfferte() {
@@ -4500,6 +4681,27 @@ function wbRemoveMW(id) {
   var el = document.getElementById('wb-mw-' + id);
   if (el) el.remove();
   wbRecalc();
+}
+
+function markWerkbonAsOpdracht(kenmerk, bedragEx) {
+  kenmerk = String(kenmerk || '').trim();
+  if (!kenmerk) return;
+  var offertes = getOffertes();
+  var idx = offertes.findIndex(function(o) { return String(o.kenmerk || '').trim() === kenmerk; });
+  if (idx < 0) {
+    saveOfferte(true);
+    offertes = getOffertes();
+    idx = offertes.findIndex(function(o) { return String(o.kenmerk || '').trim() === kenmerk; });
+  }
+  if (idx >= 0) {
+    offertes[idx].werkbon = Object.assign({}, offertes[idx].werkbon || {}, {
+      opdracht: true,
+      generatedAt: new Date().toISOString(),
+      bedragEx: Number(bedragEx) || dashTotal(offertes[idx]) || 0
+    });
+    saveOffertes(offertes);
+    if (document.getElementById('tab-dashboard')?.classList.contains('active')) renderDashboard();
+  }
 }
 
 function wbParseAmount(str) {
@@ -4689,6 +4891,7 @@ async function generateWerkbonPDF() {
   var filename = 'Werkbon_' + kenmerk + '_' + (klant || 'klant') + '.pdf';
   filename = filename.replace(/\s+/g, '_');
   doc.save(filename);
+  markWerkbonAsOpdracht(kenmerk, totaal);
 
   var wbProject = makeDropboxProjectRef(kenmerk || 'draft', locatie || '');
   uploadToDropbox(doc, filename, klant || '', wbProject, 'Werkbon');
