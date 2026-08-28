@@ -27,6 +27,9 @@ var DROPBOX_DOC_FOLDER_MAP = {
   'OLO melding': 'OLO',
   'Opleverrapport': 'Oplever rapportage',
   'Oplever rapportage': 'Oplever rapportage',
+  // Een werkbon/pre-factuur is een commercieel projectdocument en hoort
+  // daarom in de bestaande map Offerte, niet in een losse map Werkbon.
+  'Werkbon': 'Offerte',
   'Boorprofiel': 'Boorprofiel',
   'Boorprofielen': 'Boorprofiel',
   'Boorstaat': 'Boorprofiel',
@@ -69,7 +72,7 @@ function makeDropboxProjectRef(kenmerk, locatie) {
 }
 
 function buildDropboxProjectFolder(projectnr) {
-  var locatie = cleanDropboxPart(getDropboxFieldValue(['f-locatie', 'pva-locatie', 'oplever-locatie', 'olo-locatie']), '');
+  var locatie = cleanDropboxPart(getDropboxFieldValue(['f-locatie', 'pva-locatie', 'oplever-locatie', 'wb-locatie', 'olo-locatie']), '');
   var raw = cleanDropboxPart(projectnr || getDropboxFieldValue(['f-kenmerk', 'pva-projectnr', 'oplever-projectnr', 'wb-kenmerk', 'olo-projectnr']), 'Zonder projectnummer');
   if (!locatie) return raw;
 
