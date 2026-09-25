@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, memo } from 'react';
-import { supabase, loadUserData, saveUserData, saveAllUserData, DATA_KEYS } from '@/lib/supabase';
+import { supabase, loadUserData, saveUserData, saveAllUserData, refreshOffers, DATA_KEYS } from '@/lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 
 export default function Page() {
@@ -13,11 +13,33 @@ export default function Page() {
 
   // Auth
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      sessionRef.current = session;
-      setSession(session);
+    let cancelled = false;
+
+    const authTimeout = window.setTimeout(() => {
+      if (cancelled) return;
+      console.warn('Supabase sessie ophalen duurde te lang; terug naar inlogscherm.');
+      sessionRef.current = null;
+      setSession(null);
       setLoading(false);
-    });
+    }, 6000);
+
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        if (cancelled) return;
+        window.clearTimeout(authTimeout);
+        sessionRef.current = session;
+        setSession(session);
+        setLoading(false);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        window.clearTimeout(authTimeout);
+        console.error('Supabase sessie ophalen mislukt:', error);
+        sessionRef.current = null;
+        setSession(null);
+        setLoading(false);
+      });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       const prevUserId = sessionRef.current?.user?.id || null;
       const nextUserId = nextSession?.user?.id || null;
@@ -35,22 +57,65 @@ export default function Page() {
         setSession(nextSession);
       }
     });
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(authTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Load data from Supabase when session is available
   useEffect(() => {
     if (!session) return;
+    let stopped = false;
+    let busy = false;
+    const status = (text: string) => {
+      (window as any).__syncStatus = text;
+      const el = document.getElementById('cloud-sync-status');
+      if (el) el.textContent = text;
+    };
+    const sync = async () => {
+      if (busy || stopped) return;
+      busy = true;
+      status('Synchroniseren?');
+      try {
+        await refreshOffers(session.user.id);
+        if (stopped) return;
+        status('Gesynchroniseerd ' + new Date().toLocaleTimeString('nl-NL'));
+        (window as any).renderOffertes?.();
+        if (document.getElementById('tab-dashboard')?.classList.contains('active')) (window as any).renderDashboard?.();
+      } catch (error: any) {
+        status('Niet gesynchroniseerd ? ' + (error?.message || 'verbinding controleren'));
+      } finally { busy = false; }
+    };
     const init = async () => {
-      await loadUserData(session.user.id);
-      // Set up the Supabase save function for the app JS
-      (window as any).__supabaseSave = (key: string, value: unknown) => {
-        saveUserData(session.user.id, key, value);
+      try { await loadUserData(session.user.id); status('Cloud geladen'); }
+      catch (error: any) { status('Alleen lokaal ? ' + (error?.message || 'cloud niet bereikbaar')); }
+      if (stopped) return;
+      (window as any).__supabaseSave = async (key: string, value: unknown) => {
+        status('Opslaan in cloud?');
+        try { await saveUserData(session.user.id, key, value); status('Gesynchroniseerd ' + new Date().toLocaleTimeString('nl-NL')); }
+        catch (error: any) { status('Alleen lokaal opgeslagen ? ' + (error?.message || 'opnieuw proberen')); }
       };
       (window as any).__supabaseUserId = session.user.id;
+      (window as any).__syncNow = sync;
       setDataLoaded(true);
     };
-    init();
+    const visible = () => { if (document.visibilityState === 'visible') void sync(); };
+    void init();
+    const timer = window.setInterval(visible, 30000);
+    window.addEventListener('online', visible);
+    window.addEventListener('focus', visible);
+    document.addEventListener('visibilitychange', visible);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+      window.removeEventListener('online', visible);
+      window.removeEventListener('focus', visible);
+      document.removeEventListener('visibilitychange', visible);
+      delete (window as any).__syncNow;
+      delete (window as any).__supabaseSave;
+    };
   }, [session]);
 
   // Load the boorapp script after HTML is rendered and data is loaded
@@ -188,7 +253,7 @@ const MemoBoorAppShell = memo(BoorAppShell, (prev, next) => prev.userEmail === n
 function BoorAppShell({ userEmail }: { userEmail: string }) {
   const handleLogout = async () => {
     const userId = (window as any).__supabaseUserId;
-    if (userId) await saveAllUserData(userId);
+    if (userId) { try { await saveAllUserData(userId); } catch { alert('Cloudopslag mislukt. Je blijft ingelogd zodat lokale offertes behouden blijven.'); return; } }
     await supabase.auth.signOut();
     DATA_KEYS.forEach(key => localStorage.removeItem(key));
     window.location.reload();
@@ -197,6 +262,12 @@ function BoorAppShell({ userEmail }: { userEmail: string }) {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: BOORAPP_CSS }} />
+      <div style={{background:'#e7f0f8',padding:'10px 14px',fontSize:12,color:'#163252'}}>
+        <b>BoorApp ? versie 15-09-2026 sync-2</b> ? {userEmail}<br />
+        <span id="cloud-sync-status">{(typeof window !== 'undefined' && (window as any).__syncStatus) || 'Sync controleren'}</span>
+        <button style={{marginLeft:12,padding:'6px 10px'}} onClick={() => (window as any).__syncNow?.()}>Synchroniseren</button>
+        <span> ? Alleen opgeslagen offertes worden gedeeld; open conceptvelden blijven op dit apparaat.</span>
+      </div>
       <div dangerouslySetInnerHTML={{ __html: BOORAPP_HTML }} />
       <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 9999 }}>
         <button onClick={handleLogout} title={`Uitloggen (${userEmail})`}
@@ -330,6 +401,7 @@ const BOORAPP_HTML = `
   <div class="tab" onclick="switchTab('klanten')">Klantenlijst</div>
   <div class="tab" onclick="switchTab('opgeslagen')">Opgeslagen Offertes</div>
   <div class="tab" onclick="switchTab('dashboard')">Dashboard</div>
+  <div class="tab" onclick="switchTab('milieu')">Milieuquickscan</div>
   <div class="tab" onclick="switchTab('pva')">Plan van Aanpak</div>
   <div class="tab" onclick="switchTab('oplever')">Opleverrapport</div>
   <div class="tab" onclick="switchTab('werkbon')">Werkbon</div>
@@ -390,6 +462,11 @@ const BOORAPP_HTML = `
           <div class="form-group">
             <label>Locatie boringen</label>
             <input type="text" id="f-locatie" placeholder="Adres boorlocatie">
+            <div class="form-row" style="margin-top:6px; gap:8px;">
+              <div class="form-group" style="margin-bottom:0;"><label style="font-size:11px;color:#666;">RD X optioneel</label><input type="number" id="wko-rdx" placeholder="bijv. 152179" step="0.01"></div>
+              <div class="form-group" style="margin-bottom:0;"><label style="font-size:11px;color:#666;">RD Y optioneel</label><input type="number" id="wko-rdy" placeholder="bijv. 448943" step="0.01"></div>
+            </div>
+            <div style="margin-top:4px; font-size:10px; color:#777;">Vul óf een adres in, óf RD X/Y. RD-coördinaten worden direct gebruikt.</div>
             <div style="margin-top:6px; display:flex; gap:8px; align-items:center;">
               <button class="btn btn-primary" style="padding:6px 14px; font-size:12px; background:#2d7d46;" onclick="startWKO()">🌍 WKO Rapport + Interferentie</button>
               <span id="wko-status" style="font-size:11px; color:#666;"></span>
@@ -593,6 +670,31 @@ const BOORAPP_HTML = `
   </div>
 
   <!-- TAB: PLAN VAN AANPAK -->
+  <!-- TAB: MILIEUQUICKSCAN -->
+  <div id="tab-milieu" class="tab-content">
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+        <div><h2 style="margin-bottom:4px;">Geautomatiseerde milieuquickscan</h2><div class="mini-note">Openbare bodeminformatie rond de boorlocatie, met een onderzoeksbuffer van 25 meter.</div></div>
+        <button class="btn" onclick="resetMilieuQuickscan()">Quickscan wissen</button>
+        <button class="btn btn-primary" onclick="startMilieuQuickscan()" style="background:#2d7d46;">Automatische quickscan uitvoeren</button>
+      </div>
+      <div class="form-row" style="margin-top:14px;">
+        <div class="form-group"><label>Projectnummer</label><input type="text" id="mq-projectnummer" placeholder="Wordt overgenomen uit offerte"></div>
+        <div class="form-group"><label>Locatie</label><input type="text" id="mq-locatie" placeholder="Adres boorlocatie"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>RD X</label><input type="number" id="mq-rdx" step="0.01"></div>
+        <div class="form-group"><label>RD Y</label><input type="number" id="mq-rdy" step="0.01"></div>
+        <div class="form-group"><label>Onderzoeksbuffer</label><input type="text" value="25 meter" disabled></div>
+      </div>
+      <div id="mq-progress" style="display:none;margin-top:10px;padding:10px;background:#f0f7ff;border:1px solid #d0e3f7;border-radius:6px;">
+        <div id="mq-status" style="font-size:12px;font-weight:600;color:#1e3a5f;">Bronnen controleren...</div>
+        <div id="mq-log" style="font-size:11px;color:#555;margin-top:5px;"></div>
+      </div>
+      <div id="mq-resultaat" style="display:none;margin-top:12px;"></div>
+    </div>
+  </div>
+
   <div id="tab-pva" class="tab-content">
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
 
@@ -1037,6 +1139,15 @@ const BOORAPP_HTML = `
 
         <div class="panel" style="margin-top:16px;">
           <h2>Eis 6: Verontreiniging</h2>
+          <div style="margin-bottom:12px;padding:10px;background:#f8fafc;border:1px solid #e3e8ef;border-radius:6px;">
+            <label style="font-size:12px;font-weight:600;color:#1e3a5f;">Milieu-/bodemrapport analyseren (PDF)</label>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;">
+              <input type="file" id="milieu-pdf" accept="application/pdf,.pdf" onchange="analyseerMilieuPdf(this.files[0])" style="font-size:11px;">
+              <span id="milieu-status" style="font-size:11px;color:#666;"></span>
+            </div>
+            <div id="milieu-resultaat" style="display:none;margin-top:8px;"></div>
+            <div style="font-size:10px;color:#777;margin-top:6px;">Leest tekst uit het rapport en neemt de indicatieve uitkomst over in dit PvA. De inhoudelijke beoordeling blijft bij de projectleider.</div>
+          </div>
           <div class="form-row">
             <div class="form-group">
               <label>Verwachte verontreiniging</label>
@@ -1080,6 +1191,8 @@ const BOORAPP_HTML = `
             <label style="display:flex; align-items:center; gap:6px; margin:4px 0;"><input type="checkbox" id="pva-r-bomen"> Bomen / wortels nabij boorlocatie</label>
             <label style="display:flex; align-items:center; gap:6px; margin:4px 0;"><input type="checkbox" id="pva-r-fundering"> Fundering / kelder nabij boring</label>
             <label style="display:flex; align-items:center; gap:6px; margin:4px 0;"><input type="checkbox" id="pva-r-wko"> Bestaande WKO systemen in omgeving</label>
+            <label style="display:flex; align-items:center; gap:6px; margin:4px 0;"><input type="checkbox" id="pva-r-waterkering"> Waterkering / beschermingszone waterschap</label>
+            <label style="display:flex; align-items:center; gap:6px; margin:4px 0;"><input type="checkbox" id="pva-r-boringsvrij"> Boringsvrij, KWO-vrij of grondwaterbeschermingsgebied</label>
             <label style="display:flex; align-items:center; gap:6px; margin:4px 0;"><input type="checkbox" id="pva-r-drukleiding"> Hoge druk leidingen nabij</label>
           </div>
           <div class="form-row full" style="margin-top:8px;">
