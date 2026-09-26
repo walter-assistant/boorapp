@@ -27,8 +27,6 @@ var DROPBOX_DOC_FOLDER_MAP = {
   'OLO melding': 'OLO',
   'Opleverrapport': 'Oplever rapportage',
   'Oplever rapportage': 'Oplever rapportage',
-  // Een werkbon/pre-factuur is een commercieel projectdocument en hoort
-  // daarom in de bestaande map Offerte, niet in een losse map Werkbon.
   'Werkbon': 'Offerte',
   'Boorprofiel': 'Boorprofiel',
   'Boorprofielen': 'Boorprofiel',
@@ -90,12 +88,12 @@ function getDropboxDocFolder(docType) {
   return DROPBOX_DOC_FOLDER_MAP[docType] || cleanDropboxPart(docType, 'Documenten');
 }
 
-async function uploadToDropbox(pdfDoc, filename, klant, projectnr, docType) {
+async function uploadToDropbox(pdfDoc, filename, klant, projectnr, docType, projectFolderOverride) {
   try {
     console.log('Dropbox upload:', {klant, projectnr, docType, filename});
     var pdfBase64 = pdfDoc.output('datauristring').split(',')[1];
     var klantFolder = cleanDropboxPart(klant || getDropboxFieldValue(['f-klant', 'pva-klant', 'oplever-klant', 'wb-bedrijf']), 'Zonder klant');
-    var projectFolder = buildDropboxProjectFolder(projectnr);
+    var projectFolder = projectFolderOverride || buildDropboxProjectFolder(projectnr);
     var docFolder = getDropboxDocFolder(docType);
     var projectRoot = DROPBOX_BASE_PROJECT_PATH + '/' + klantFolder + '/' + projectFolder;
     var folderPath = projectRoot + '/' + docFolder;
@@ -212,8 +210,16 @@ function saveKlanten(arr) {
     try { window.__supabaseSave('gr_klanten', arr); } catch(e) {}
   }
 }
-function getOffertes() { return JSON.parse(localStorage.getItem('gr_offertes') || '[]'); }
+function getOffertes() { return JSON.parse(localStorage.getItem('gr_offertes') || '[]').filter(o => !o._syncDeleted); }
 function saveOffertes(arr) {
+  const previous = JSON.parse(localStorage.getItem('gr_offertes') || '[]');
+  const id = o => String(o.id || o.kenmerk || JSON.stringify(o));
+  const now = new Date().toISOString();
+  arr = arr.map(o => {
+    const old = previous.find(p => id(p) === id(o));
+    return JSON.stringify(old) !== JSON.stringify(o) ? {...o, _syncUpdatedAt:now} : o;
+  });
+  previous.forEach(o => { if (!arr.some(p => id(p) === id(o))) arr.push({...o,_syncDeleted:true,_syncUpdatedAt:o._syncDeleted ? o._syncUpdatedAt : now}); });
   localStorage.setItem('gr_offertes', JSON.stringify(arr));
   // Sync naar Supabase zodat deletes ook in de cloud staan
   if (window.__supabaseSave) {
@@ -239,6 +245,24 @@ const WKO_SVC = {
 const WKO_VERBOD = [{id:0,name:'Installaties'},{id:1,name:'Open bodemenergiesystemen'},{id:2,name:'Grondwateronttrekking'},{id:3,name:'Gesloten bodemenergiesystemen'}];
 const WKO_AANDACHT = [{id:0,name:'Natuur'},{id:1,name:'Archeologie'},{id:2,name:'Aardkundige waarden'}];
 const WKO_ACTUEEL = [{id:0,name:'Natura 2000 / NNN'},{id:1,name:'Restrictie dieptebeperking'},{id:2,name:'Aardkundige waarden'},{id:3,name:'Restrictie ordening'},{id:4,name:'Verbodsgebieden'},{id:5,name:'Specifiek provinciaal beleid'}];
+
+// Officiële regionale detailbronnen. Deze vullen de landelijke RVO-lagen aan.
+// Een mislukte regionale bron mag de landelijke WKO-check nooit blokkeren.
+const LOCATIECHECK_BRONNEN = [
+  {regio:'Provincie Gelderland', groep:'grondwater', naam:'Minder kwetsbaar drinkwaterreserveringsgebied', niveau:'oranje', url:'https://geoportaal.gelderland.nl/gisserver/rest/services/Omgevingsverordening/Omgevingsverordening/MapServer', layer:81},
+  {regio:'Provincie Gelderland', groep:'grondwater', naam:'Kwetsbaar drinkwaterreserveringsgebied', niveau:'oranje', url:'https://geoportaal.gelderland.nl/gisserver/rest/services/Omgevingsverordening/Omgevingsverordening/MapServer', layer:76},
+  {regio:'Provincie Gelderland', groep:'grondwater', naam:'Koude-warmteopslagvrije zone', niveau:'rood', url:'https://geoportaal.gelderland.nl/gisserver/rest/services/Omgevingsverordening/Omgevingsverordening/MapServer', layer:31},
+  {regio:'Provincie Gelderland', groep:'grondwater', naam:'Intrekgebied', niveau:'oranje', url:'https://geoportaal.gelderland.nl/gisserver/rest/services/Omgevingsverordening/Omgevingsverordening/MapServer', layer:32},
+  {regio:'Provincie Gelderland', groep:'grondwater', naam:'Boringsvrije zone', niveau:'oranje', url:'https://geoportaal.gelderland.nl/gisserver/rest/services/Omgevingsverordening/Omgevingsverordening/MapServer', layer:46},
+  {regio:'Provincie Gelderland', groep:'grondwater', naam:'Grondwaterbeschermingsgebied', niveau:'oranje', url:'https://geoportaal.gelderland.nl/gisserver/rest/services/Omgevingsverordening/Omgevingsverordening/MapServer', layer:33},
+  {regio:'Provincie Gelderland', groep:'grondwater', naam:'Waterwingebied', niveau:'rood', url:'https://geoportaal.gelderland.nl/gisserver/rest/services/Omgevingsverordening/Omgevingsverordening/MapServer', layer:37},
+  {regio:'HHNK', groep:'waterkering', naam:'Regionale waterkering', niveau:'oranje', url:'https://kaarten.hhnk.nl/arcgis/rest/services/od_legger/od_legger_regionaal_waterveiligheid_vg/MapServer', layer:0},
+  {regio:'HHNK', groep:'waterkering', naam:'Regionaal waterstaatswerk', niveau:'oranje', url:'https://kaarten.hhnk.nl/arcgis/rest/services/od_legger/od_legger_regionaal_waterveiligheid_vg/MapServer', layer:1},
+  {regio:'HHNK', groep:'waterkering', naam:'Regionale beschermingszone', niveau:'oranje', url:'https://kaarten.hhnk.nl/arcgis/rest/services/od_legger/od_legger_regionaal_waterveiligheid_vg/MapServer', layer:4},
+  {regio:'HHNK', groep:'waterkering', naam:'Primaire waterkering', niveau:'oranje', url:'https://kaarten.hhnk.nl/arcgis/rest/services/od_legger/od_legger_primair_waterveiligheid_vg/MapServer', layer:0},
+  {regio:'HHNK', groep:'waterkering', naam:'Primair waterstaatswerk', niveau:'oranje', url:'https://kaarten.hhnk.nl/arcgis/rest/services/od_legger/od_legger_primair_waterveiligheid_vg/MapServer', layer:1},
+  {regio:'HHNK', groep:'waterkering', naam:'Primaire beschermingszone', niveau:'oranje', url:'https://kaarten.hhnk.nl/arcgis/rest/services/od_legger/od_legger_primair_waterveiligheid_vg/MapServer', layer:2}
+];
 
 async function wkoQueryPoint(baseUrl, layerId, x, y) {
   const params = new URLSearchParams({
@@ -531,6 +555,16 @@ async function startWKO() {
     });
     addLog(report.restricties.length ? '\u26A0 Restricties: ' + report.restricties.map(r=>r.type).join(', ') : '\u2714 Geen restricties');
 
+    // 5b. Officiële provinciale/waterschapsdetailkaarten
+    addLog('Provinciale en waterschapszones controleren...');
+    report.locatiecheck = await runRegionaleLocatiecheck(rdX, rdY);
+    if (report.locatiecheck.treffers.length) {
+      addLog('\u26A0 Regionale zones: ' + report.locatiecheck.treffers.map(t => t.naam).join(', '));
+    } else {
+      addLog('\u2714 Geen treffers in gekoppelde regionale detailkaarten');
+    }
+    if (report.locatiecheck.fouten.length) addLog(`\u26A0 ${report.locatiecheck.fouten.length} regionale kaartlagen niet bereikbaar`);
+
     // 6. Nabije systemen
     addLog('Bestaande WKO systemen zoeken (500m)...');
     const punten = await wkoQueryBuffer(WKO_SVC.punten, 0, rdX, rdY, 500);
@@ -538,11 +572,12 @@ async function startWKO() {
     addLog(report.nabijeSystemen > 0 ? `\u{1F4CD} ${report.nabijeSystemen} systemen binnen 500m` : '\u2714 Geen nabije systemen');
 
     // 7. Conclusie
-    if (report.verbodsgebieden.length > 0) {
+    const regionaleVerboden = report.locatiecheck.treffers.filter(t => t.niveau === 'rood');
+    if (report.verbodsgebieden.length > 0 || regionaleVerboden.length > 0) {
       report.conclusie = 'Niet toegestaan';
       report.conclusieKleur = 'rood';
-      report.conclusieDetail = 'Er zijn verbodsgebieden gevonden. Bodemenergie is hier niet toegestaan.';
-    } else if (report.aandachtsgebieden.length > 0 || report.restricties.length > 0) {
+      report.conclusieDetail = 'Er is een verbodsgebied of zwaar beschermd gebied gevonden. Laat het bevoegd gezag de toepasselijke regel bevestigen.';
+    } else if (report.aandachtsgebieden.length > 0 || report.restricties.length > 0 || report.locatiecheck.treffers.length > 0) {
       report.conclusie = 'Onder voorwaarden';
       report.conclusieKleur = 'oranje';
       const geb = [...report.aandachtsgebieden.map(a=>a.type), ...report.restricties.map(r=>r.type)];
@@ -576,6 +611,7 @@ async function startWKO() {
         <div style="font-size:11px; color:#666; margin-top:2px;">${report.location.address}</div>
         <div style="font-size:11px; color:#888;">Gemeente: ${report.gemeente} \u00B7 RES: ${report.resRegio} \u00B7 RD: ${Math.round(rdX)}, ${Math.round(rdY)}</div>
         ${gebiedenHTML}
+        ${locatiecheckHtml(report.locatiecheck)}
         ${report.nabijeSystemen > 0 ? '<div style="margin-top:4px; font-size:11px;">\u{1F4CD} ' + report.nabijeSystemen + ' bestaande WKO systemen binnen 500m</div>' : ''}
         <div style="margin-top:6px; font-size:10px; color:#aaa;">${report.conclusieDetail}</div>
       </div>
@@ -663,6 +699,7 @@ async function startWKO() {
     } catch (e) { addLog('Kaart niet beschikbaar: ' + e.message); }
 
     window._lastWKOReport = report;
+    syncLocatiecheckToPva(report);
     // WKO/interferentie hoort bij het project: meteen meebewaren zodat laden later geen oude WKO toont.
     try { if ((document.getElementById('f-kenmerk')?.value || '').trim()) saveOfferte(true); } catch(e) {}
 
@@ -1114,7 +1151,7 @@ function parseEur(s) {
 // ============================================================
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach((t, i) => {
-    const tabs = ['offerte', 'klanten', 'opgeslagen', 'dashboard', 'pva', 'oplever', 'werkbon', 'olo'];
+    const tabs = ['offerte', 'klanten', 'opgeslagen', 'dashboard', 'milieu', 'pva', 'oplever', 'werkbon', 'olo'];
     t.classList.toggle('active', tabs[i] === name);
   });
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -2258,6 +2295,7 @@ function generateProjectNummer() {
 }
 
 function nieuweOfferteBA() {
+  resetMilieuQuickscan(false);
   // Reset alle offerte-velden
   document.getElementById('f-klant').value = '';
   document.getElementById('f-tav').value = '';
@@ -2309,7 +2347,9 @@ function renderOffertes() {
   const list = document.getElementById('offertes-list');
   const offertes = getOffertes();
   const showArchived = document.getElementById('toonArchief')?.checked || false;
-  const visible = offertes.map((o, idx) => ({ o, idx })).filter(x => showArchived ? true : !x.o.archived);
+  const visible = offertes.map((o, idx) => ({ o, idx }))
+    .filter(x => showArchived ? true : !x.o.archived)
+    .sort((a, b) => String(b.o.kenmerk || '').localeCompare(String(a.o.kenmerk || ''), 'nl', {numeric:true}) || (Date.parse(b.o.savedAt || '') || 0) - (Date.parse(a.o.savedAt || '') || 0));
   if (!visible.length) {
     list.innerHTML = '<div class="empty-state"><p>' + (showArchived ? 'Geen offertes (ook niet in archief)' : 'Geen actieve offertes') + '</p></div>';
     return;
@@ -2380,6 +2420,7 @@ function normalizeOfferteData(o) {
 function loadOfferte(idx) {
   const o = normalizeOfferteData(getOffertes()[idx]);
   if (!o) return;
+  resetMilieuQuickscan(false);
   document.getElementById('f-klant').value = o.klantId || '';
   document.getElementById('f-tav').value = o.tav || '';
   document.getElementById('f-kenmerk').value = o.kenmerk || '';
@@ -3287,7 +3328,10 @@ function gatherPvaData() {
     ['pva-r-artesisch', 'Risico op artesisch water'], ['pva-r-verontreiniging', 'Bekende verontreiniging in omgeving'],
     ['pva-r-stortgrond', 'Stortgrond / puinverharding verwacht'], ['pva-r-tanks', 'Oude tanks / leidingen op locatie'],
     ['pva-r-bomen', 'Bomen / wortels nabij boorlocatie'], ['pva-r-fundering', 'Fundering / kelder nabij boring'],
-    ['pva-r-wko', 'Bestaande WKO systemen in omgeving'], ['pva-r-drukleiding', 'Hoge druk leidingen nabij']
+    ['pva-r-wko', 'Bestaande WKO systemen in omgeving'],
+    ['pva-r-waterkering', 'Waterkering / beschermingszone waterschap'],
+    ['pva-r-boringsvrij', 'Boringsvrij, KWO-vrij of grondwaterbeschermingsgebied'],
+    ['pva-r-drukleiding', 'Hoge druk leidingen nabij']
   ]);
   const fotos = getCheckedLabels('', [
     ['pva-f-voor', 'Situatie VOOR aanvang'], ['pva-f-opstelling', 'Boorstelling in positie'],
@@ -4015,7 +4059,9 @@ function copyOfferteToOplever(showAlert = true) {
   document.getElementById('opl-telefoon').value = v('f-telefoon');
   document.getElementById('opl-diameter').value = String(firstCluster.diameter || d.diameter || '40');
   document.getElementById('opl-luslengte').value = String(firstCluster.luslengte || d.luslengte || '165');
-  document.getElementById('opl-bronnen').value = String(firstCluster.boringen || d.boringen || '1');
+  const totaalBronnen = (d.clusters || []).reduce((totaal, cluster) =>
+    totaal + (parseInt(cluster.boringen, 10) || 0), 0);
+  document.getElementById('opl-bronnen').value = String(totaalBronnen || firstCluster.boringen || d.boringen || '1');
   document.getElementById('opl-datum').value = new Date().toISOString().substring(0, 10);
 
   // Kopieer PvA-velden indien beschikbaar
@@ -4030,6 +4076,27 @@ function copyOfferteToOplever(showAlert = true) {
   if (v('pva-olo')) document.getElementById('opl-olo').value = v('pva-olo');
 
   renderBronTabel();
+
+  // Neem ook de diepte per bron over. Voorheen werd alleen het aantal bronnen
+  // gekopieerd, waardoor het opleverrapport "-m" bij iedere bron afdrukte.
+  const bronDieptes = [];
+  if (Array.isArray(d.clusters) && d.clusters.length) {
+    d.clusters.forEach(cluster => {
+      const aantal = Math.max(0, parseInt(cluster.boringen, 10) || 0);
+      const diepte = parseFloat(cluster.diepte);
+      for (let i = 0; i < aantal; i++) bronDieptes.push(Number.isFinite(diepte) && diepte > 0 ? diepte : '');
+    });
+  }
+  const standaardDiepte = parseFloat(firstCluster.diepte || d.mpb || d.diepte || 0);
+  const aantalBronnen = parseInt(document.getElementById('opl-bronnen').value, 10) || 1;
+  for (let i = 1; i <= aantalBronnen; i++) {
+    const diepteEl = document.getElementById(`opl-bron-${i}-diepte`);
+    const diepte = bronDieptes[i - 1] || standaardDiepte;
+    if (diepteEl && Number.isFinite(Number(diepte)) && Number(diepte) > 0) {
+      diepteEl.value = String(diepte);
+    }
+  }
+
   saveOpleverState();
   if (showAlert) alert('Gegevens overgenomen uit offerte/PvA!');
 }
@@ -4302,12 +4369,19 @@ function renderBronTabel() {
 function gatherOpleverData() {
   const v = id => (document.getElementById(id)?.value || '');
   const n = parseInt(v('opl-bronnen')) || 1;
+  const offerte = gatherOfferteData();
+  const offerteDieptes = [];
+  (offerte.clusters || []).forEach(cluster => {
+    const aantal = Math.max(0, parseInt(cluster.boringen, 10) || 0);
+    const diepte = parseFloat(cluster.diepte);
+    for (let i = 0; i < aantal; i++) offerteDieptes.push(Number.isFinite(diepte) && diepte > 0 ? String(diepte) : '');
+  });
   const bronnen = [];
   for (let i = 1; i <= n; i++) {
     bronnen.push({
       nr: i,
       naam: v('opl-bron-' + i + '-naam') || 'Bron ' + i,
-      diepte: v('opl-bron-' + i + '-diepte') || '-',
+      diepte: v('opl-bron-' + i + '-diepte') || offerteDieptes[i - 1] || '-',
       pomdruk: v('opl-bron-' + i + '-pomdruk') || '5',
       tijd: v('opl-bron-' + i + '-tijd') || '20',
       druktestbar: v('opl-bron-' + i + '-druktestbar') || '3',
@@ -4330,6 +4404,338 @@ function gatherOpleverData() {
     monteurs: v('opl-monteurs'), werkzaamheden: v('opl-werkzaamheden'),
     bronnen, aantalBronnen: n,
   };
+}
+
+async function runRegionaleLocatiecheck(x, y) {
+  const resultaten = await Promise.allSettled(LOCATIECHECK_BRONNEN.map(async bron => {
+    const data = await wkoQueryPoint(bron.url, bron.layer, x, y);
+    if (data.error) throw new Error(data.error.message || 'Kaartservice niet beschikbaar');
+    return { ...bron, geraakt: Boolean(data.features?.length), aantal: data.features?.length || 0, kenmerken: data.features?.[0]?.attributes || null };
+  }));
+  const checks = resultaten.map((resultaat, index) => resultaat.status === 'fulfilled'
+    ? resultaat.value
+    : { ...LOCATIECHECK_BRONNEN[index], geraakt:false, fout:true, foutmelding:resultaat.reason?.message || 'Niet beschikbaar' });
+  return {
+    checks,
+    treffers: checks.filter(c => c.geraakt),
+    fouten: checks.filter(c => c.fout),
+    gecontroleerdOp: new Date().toISOString()
+  };
+}
+
+function locatiecheckHtml(locatiecheck) {
+  if (!locatiecheck) return '';
+  const treffers = locatiecheck.treffers || [];
+  const fouten = locatiecheck.fouten || [];
+  const rood = treffers.filter(t => t.niveau === 'rood');
+  const oranje = treffers.filter(t => t.niveau !== 'rood');
+  let regels = '';
+  if (rood.length) regels += `<div style="margin-top:4px;color:#c62828;"><b>Verbod/zware beperking:</b> ${rood.map(t => t.naam).join(', ')}</div>`;
+  if (oranje.length) regels += `<div style="margin-top:4px;color:#e65100;"><b>Regel of vergunning controleren:</b> ${oranje.map(t => `${t.naam} (${t.regio})`).join(', ')}</div>`;
+  if (!treffers.length) regels += '<div style="margin-top:4px;color:#2e7d32;">Geen treffers in gekoppelde Gelderland- en HHNK-detailkaarten</div>';
+  if (fouten.length) regels += `<div style="margin-top:4px;color:#777;">${fouten.length} regionale kaartlagen tijdelijk niet controleerbaar</div>`;
+  return `<div style="margin-top:8px;padding-top:7px;border-top:1px solid #e2e6eb;font-size:11px;"><b>Regionale locatiecheck</b>${regels}<div style="margin-top:4px;color:#999;">Indicatieve voorcontrole; verifieer vergunning/melding via bevoegd gezag en Omgevingsloket.</div></div>`;
+}
+
+function syncLocatiecheckToPva(report) {
+  const treffers = report?.locatiecheck?.treffers || [];
+  const water = treffers.filter(t => t.groep === 'waterkering');
+  const grondwater = treffers.filter(t => t.groep === 'grondwater');
+  const waterCb = document.getElementById('pva-r-waterkering');
+  const grondCb = document.getElementById('pva-r-boringsvrij');
+  if (waterCb) waterCb.checked = water.length > 0;
+  if (grondCb) grondCb.checked = grondwater.length > 0;
+  const opmerkingen = document.getElementById('pva-risico-opmerkingen');
+  if (!opmerkingen || !treffers.length) return;
+  const regel = `Automatische locatiecheck ${new Date(report.locatiecheck.gecontroleerdOp).toLocaleDateString('nl-NL')}: ${treffers.map(t => `${t.naam} (${t.regio})`).join(', ')}. Controleer toepasselijke regels en benodigde toestemming bij het bevoegd gezag.`;
+  const huidig = opmerkingen.value.trim();
+  if (!huidig.includes('Automatische locatiecheck')) opmerkingen.value = huidig ? `${huidig}\n${regel}` : regel;
+}
+
+async function leesPdfTekst(file) {
+  if (!file) throw new Error('Geen PDF geselecteerd');
+  if (!window.pdfjsLib) throw new Error('PDF-lezer is nog niet geladen; ververs de pagina');
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const pdf = await window.pdfjsLib.getDocument({data:bytes}).promise;
+  const paginas = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const pagina = await pdf.getPage(i);
+    const inhoud = await pagina.getTextContent();
+    paginas.push(inhoud.items.map(item => item.str || '').join(' '));
+  }
+  return {tekst:paginas.join('\n'), paginas:pdf.numPages};
+}
+
+function beoordeelMilieuTekst(tekst, bestandsnaam, paginas) {
+  const schoon = String(tekst || '').replace(/\s+/g, ' ').trim();
+  const laag = schoon.toLowerCase();
+  // De aanbiedersbijlagen bevatten verklarende teksten over verontreiniging.
+  // Voor de automatische beoordeling weegt daarom vooral het adviesdeel vóór "bijlagen".
+  const advies = laag.split(/\bbijlagen\b/)[0] || laag;
+  const onverdacht = /locatie.{0,180}(?:als |is |wordt )?onverdacht|onverdacht op het voorkomen van een bodem/.test(advies);
+  const geenErnstig = /geen (?:gevallen?|geval) van ernstige bodemverontreiniging/.test(advies);
+  const asbestOnverdacht = /asbest.{0,100}onverdacht|geen.{0,100}asbest[- ]verdachte activiteiten/.test(advies);
+  const geenOnderzoek = /geen eerder bodemonderzoek/.test(advies);
+  const basisHygiene = /basishygiënische maatregelen/.test(advies);
+  const aanvullendNietNodig = /geen aanvullende (?:procedures|maatregelen|onderzoek).{0,100}(?:noodzakelijk|nodig)|zonder aanvullend onderzoek/.test(advies);
+  const verdacht = /(?:sterk|ernstig|matig) verontreinigd|overschrijding.{0,60}interventiewaarde|verkennend bodemonderzoek (?:is )?(?:noodzakelijk|benodigd)|sanering (?:is )?(?:noodzakelijk|benodigd)/.test(advies)
+    && !/geen (?:gevallen?|geval) van ernstige bodemverontreiniging/.test(advies);
+  const bodemfunctie = (schoon.match(/bodemfunctie\s*[\u2018'\"]?([A-Za-zÀ-ſ -]{3,30})/i)?.[1] || '').trim().replace(/[.].*$/, '');
+  let niveau = 'oranje';
+  let conclusie = 'Handmatig beoordelen';
+  if (verdacht) { niveau = 'rood'; conclusie = 'Verdachte/verontreinigde locatie'; }
+  else if (onverdacht && (geenErnstig || aanvullendNietNodig)) { niveau = 'groen'; conclusie = 'Onverdacht volgens aangeleverd rapport'; }
+  const signalen = [];
+  if (onverdacht) signalen.push('locatie als onverdacht beoordeeld');
+  if (geenErnstig) signalen.push('geen ernstige bodemverontreiniging gemeld');
+  if (asbestOnverdacht) signalen.push('asbest onverdacht');
+  if (geenOnderzoek) signalen.push('geen eerder bodemonderzoek op locatie');
+  if (basisHygiene) signalen.push('CROW 400 basishygiënische maatregelen genoemd');
+  if (aanvullendNietNodig) signalen.push('geen aanvullend onderzoek/procedure geadviseerd');
+  if (/pfas/.test(laag)) signalen.push('PFAS-informatie aanwezig');
+  return {bestandsnaam, paginas, gecontroleerdOp:new Date().toISOString(), niveau, conclusie, signalen, bodemfunctie, tekstlengte:schoon.length};
+}
+
+function syncMilieuCheckToPva(check) {
+  const select = document.getElementById('pva-verontreiniging');
+  const risico = document.getElementById('pva-r-verontreiniging');
+  const maatregelen = document.getElementById('pva-extramaatregelen');
+  const opmerkingen = document.getElementById('pva-risico-opmerkingen');
+  if (select) select.value = check.niveau === 'groen' ? 'Onverdacht' : 'Anders';
+  if (risico) risico.checked = check.niveau !== 'groen';
+  if (maatregelen && check.niveau === 'groen') maatregelen.value = check.signalen.some(s => s.includes('basishygiënische')) ? 'CROW 400 basishygiënische maatregelen' : 'Geen aanvullende maatregelen; alert op afwijkende geur, kleur en bijmengingen';
+  if (maatregelen && check.niveau !== 'groen') maatregelen.value = 'Voor uitvoering handmatig beoordelen en zo nodig aanvullend bodemonderzoek';
+  if (opmerkingen) {
+    const regel = `Milieucheck ${new Date(check.gecontroleerdOp).toLocaleDateString('nl-NL')} (${check.bestandsnaam}): ${check.conclusie}. ${check.signalen.join('; ') || 'geen eenduidige conclusie automatisch herkend'}.`;
+    if (!opmerkingen.value.includes(`(${check.bestandsnaam})`)) opmerkingen.value = opmerkingen.value.trim() ? `${opmerkingen.value.trim()}\n${regel}` : regel;
+  }
+}
+
+async function analyseerMilieuPdf(file) {
+  const status = document.getElementById('milieu-status');
+  const resultaat = document.getElementById('milieu-resultaat');
+  if (!file) return;
+  status.textContent = 'PDF lezen...'; status.style.color = '#c67600';
+  resultaat.style.display = 'none';
+  try {
+    const gelezen = await leesPdfTekst(file);
+    const check = beoordeelMilieuTekst(gelezen.tekst, file.name, gelezen.paginas);
+    window._lastMilieuCheck = check;
+    syncMilieuCheckToPva(check);
+    const kleur = check.niveau === 'groen' ? '#2e7d32' : check.niveau === 'rood' ? '#c62828' : '#e65100';
+    resultaat.style.display = 'block';
+    resultaat.innerHTML = `<div style="border-left:4px solid ${kleur};padding:8px 10px;background:#fff;border-radius:0 5px 5px 0;font-size:11px;"><div style="font-size:13px;font-weight:700;color:${kleur};">${check.conclusie}</div><div style="color:#777;">${check.paginas} pagina's · ${check.bestandsnaam}</div>${check.bodemfunctie ? `<div style="margin-top:4px;"><b>Bodemfunctie:</b> ${check.bodemfunctie}</div>` : ''}<div style="margin-top:4px;">${check.signalen.length ? check.signalen.map(s => `• ${s}`).join('<br>') : '• Geen eenduidige conclusie herkend'}</div><div style="margin-top:5px;color:#999;">Indicatieve tekstherkenning; controleer rapport en bronstukken inhoudelijk.</div></div>`;
+    status.textContent = 'Analyse klaar'; status.style.color = kleur;
+  } catch (error) {
+    status.textContent = 'Analyse mislukt'; status.style.color = '#c62828';
+    resultaat.style.display = 'block';
+    resultaat.innerHTML = `<div style="color:#c62828;font-size:11px;">${error.message}</div>`;
+  }
+}
+
+const BODEMLOKET_WMS = 'https://www.bodemloket.nl/mapserver/?map=/etc/mapserver/maps/algemeen.map';
+const BODEMLOKET_LAGEN = [
+  {id:'zonering_bovengrond', naam:'Bodemkwaliteitszonering bovengrond'},
+  {id:'ontgravingskaart_bovengrond', naam:'Ontgravingskaart bovengrond'},
+  {id:'toepassingskaart_bovengrond', naam:'Toepassingskaart bovengrond'}
+];
+
+async function bodemloketFeatureInfo(layer, x, y) {
+  const marge = 12;
+  const params = new URLSearchParams({
+    map:'/etc/mapserver/maps/algemeen.map', SERVICE:'WMS', VERSION:'1.3.0', REQUEST:'GetFeatureInfo',
+    CRS:'EPSG:28992', BBOX:`${x-marge},${y-marge},${x+marge},${y+marge}`,
+    WIDTH:'101', HEIGHT:'101', I:'50', J:'50', LAYERS:layer, QUERY_LAYERS:layer,
+    STYLES:'', FORMAT:'image/png', INFO_FORMAT:'text/plain', FEATURE_COUNT:'10'
+  });
+  const response = await fetch(`https://www.bodemloket.nl/mapserver/?${params}`);
+  if (!response.ok) throw new Error(`Bodemloket HTTP ${response.status}`);
+  const tekst = await response.text();
+  return {gevonden:!/Search returned no results|Geen resultaten/i.test(tekst), tekst:tekst.replace(/GetFeatureInfo results:/i, '').trim()};
+}
+
+function milieuQuickscanLog(tekst) {
+  const log = document.getElementById('mq-log');
+  if (log) log.innerHTML += `<div style="padding:2px 0;">▸ ${tekst}</div>`;
+}
+
+function resetMilieuQuickscan(save = true) {
+  window._milieuQuickscanRun = (window._milieuQuickscanRun || 0) + 1;
+  window._lastMilieuQuickscan = null;
+  ['mq-projectnummer','mq-locatie','mq-rdx','mq-rdy'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  ['mq-resultaat','mq-log','mq-status'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.innerHTML = '';
+  });
+  ['mq-resultaat','mq-progress'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  if (save) { try { autoSaveAll(); } catch(e) {} }
+}
+
+function syncMilieuQuickscanFromOfferte() {
+  const koppelingen = [['mq-projectnummer','f-kenmerk'],['mq-locatie','f-locatie'],['mq-rdx','wko-rdx'],['mq-rdy','wko-rdy']];
+  koppelingen.forEach(([doel, bron]) => {
+    const d = document.getElementById(doel), b = document.getElementById(bron);
+    if (d && b && !String(d.value || '').trim()) d.value = b.value || '';
+  });
+}
+
+async function startMilieuQuickscan() {
+  const run = window._milieuQuickscanRun = (window._milieuQuickscanRun || 0) + 1;
+  window._lastMilieuQuickscan = null;
+  syncMilieuQuickscanFromOfferte();
+  const progress = document.getElementById('mq-progress');
+  const status = document.getElementById('mq-status');
+  const resultaat = document.getElementById('mq-resultaat');
+  const log = document.getElementById('mq-log');
+  progress.style.display = 'block'; resultaat.style.display = 'none'; log.innerHTML = '';
+  status.textContent = 'Bronnen controleren...'; status.style.color = '#1e3a5f';
+  try {
+    let adres = document.getElementById('mq-locatie').value.trim();
+    let x = numVal(document.getElementById('mq-rdx').value, null);
+    let y = numVal(document.getElementById('mq-rdy').value, null);
+    let pdok = null;
+    if (!(Number.isFinite(x) && Number.isFinite(y))) {
+      if (!adres) throw new Error('Vul een adres of RD-coördinaten in');
+      milieuQuickscanLog('Adres en bevoegd gebied bepalen via PDOK...');
+      pdok = await pdokLookupBest(adres, 10);
+    if (run !== window._milieuQuickscanRun) return;
+      const rd = pdok?.centroide_rd?.match(/POINT\(([^ ]+) ([^ ]+)\)/);
+      if (!rd) throw new Error('Adres niet gevonden of geen RD-coördinaat beschikbaar');
+      x = Number(rd[1]); y = Number(rd[2]); adres = pdok.weergavenaam || adres;
+      document.getElementById('mq-rdx').value = Math.round(x); document.getElementById('mq-rdy').value = Math.round(y);
+      document.getElementById('mq-locatie').value = adres;
+    } else {
+      milieuQuickscanLog('Handmatige RD-coördinaten gebruikt');
+    }
+    milieuQuickscanLog(`Locatie: ${adres || `RD ${Math.round(x)}, ${Math.round(y)}`}`);
+    milieuQuickscanLog('Bodemkwaliteitslagen Bodemloket opvragen...');
+    const bodemSettled = await Promise.allSettled(BODEMLOKET_LAGEN.map(async laag => ({...laag, ...(await bodemloketFeatureInfo(laag.id, x, y))})));
+    if (run !== window._milieuQuickscanRun) return;
+    const bodemlagen = bodemSettled.map((r,i) => r.status === 'fulfilled' ? r.value : {...BODEMLOKET_LAGEN[i], fout:true, tekst:r.reason?.message || 'Niet beschikbaar'});
+    milieuQuickscanLog(`${bodemlagen.filter(b=>b.gevonden).length} van ${bodemlagen.length} bodemkwaliteitslagen geven locatie-informatie`);
+    milieuQuickscanLog('Provinciale en waterschapszones controleren...');
+    const regionale = await runRegionaleLocatiecheck(x, y);
+    if (run !== window._milieuQuickscanRun) return;
+    milieuQuickscanLog(regionale.treffers.length ? `${regionale.treffers.length} regionale zone(s) gevonden` : 'Geen treffers in gekoppelde regionale zones');
+    milieuQuickscanLog('Regionaal bodeminformatiesysteem ODNZKG controleren...');
+    let od = null;
+    try {
+      const odResp = await fetch('/api/milieu/odnzkg', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({x,y,radius:25})});
+    if (run !== window._milieuQuickscanRun) return;
+      if (!odResp.ok) throw new Error(`HTTP ${odResp.status}`);
+      od = await odResp.json();
+    if (run !== window._milieuQuickscanRun) return;
+      od.inWerkgebied = Boolean(od.layers?.find(l=>l.id==='Werkgebied ODNZKG')?.count);
+      od.resultaten = (od.layers || []).filter(l=>l.id!=='Werkgebied ODNZKG' && l.count>0);
+      if (od.inWerkgebied) milieuQuickscanLog(od.resultaten.length ? `ODNZKG: ${od.resultaten.reduce((n,l)=>n+l.count,0)} object(en) in 25 m gevonden` : 'ODNZKG: geen bodemlocaties, onderzoeken of tanks in 25 m gevonden');
+      else milieuQuickscanLog('Locatie valt niet binnen het ODNZKG-werkgebied');
+    } catch (error) {
+    if (run !== window._milieuQuickscanRun) return;
+      od = {ok:false, error:error.message, inWerkgebied:false, resultaten:[]};
+      milieuQuickscanLog('ODNZKG-bron niet bereikbaar');
+    }
+    milieuQuickscanLog('ODNHN: bodemlocaties, onderzoeken en HBB controleren...');
+    let nhn;
+    try {
+      const response = await fetch('/api/milieu/odnhn', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({x,y})});
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      nhn = await response.json();
+      if (!Array.isArray(nhn.layers)) throw new Error('Geen bronresultaat');
+      nhn.resultaten = nhn.layers.filter(l => l.ok && l.count > 0);
+      nhn.summary = nhn.ok ? `ODNHN: ${nhn.resultaten.reduce((n,l)=>n+l.count,0)} kaartobject(en) gevonden bij puntbevraging op het boorpunt; bodemlocaties, onderzoeken en HBB. De volledige 25 m-buffer is niet gecontroleerd.` : 'ODNHN: broncontrole onvolledig; niet alle lagen konden volledig worden gecontroleerd.';
+    } catch(error) {
+      nhn = {ok:false, layers:[], resultaten:[], summary:'ODNHN: bron niet bereikbaar; aanvullende controle vereist.'};
+    }
+    if (run !== window._milieuQuickscanRun) return;
+    milieuQuickscanLog(nhn.summary);
+    const gemeente = pdok?.gemeentenaam || pdok?.gemeente_naam || 'Niet automatisch bepaald';
+    const provincie = pdok?.provincienaam || pdok?.provincie_naam || 'Niet automatisch bepaald';
+    const bronFouten = bodemlagen.filter(b=>b.fout).length + regionale.fouten.length + (od?.ok===false || od?.layers?.some(l=>!l.ok) ? 1 : 0) + (nhn.ok ? 0 : 1);
+    const gegevens = bodemlagen.filter(b=>b.gevonden);
+    const odRisico = Boolean((od?.inWerkgebied && od.resultaten?.length) || nhn.resultaten.length);
+    const conclusie = odRisico ? 'Bodeminformatie gevonden — handmatig beoordelen' : bronFouten ? 'Broncontrole onvolledig' : od?.inWerkgebied ? 'Geen geregistreerde bodeminformatie binnen 25 meter' : 'Aanvullende regionale bodembeoordeling vereist';
+    const quickscan = {
+      projectnummer:document.getElementById('mq-projectnummer').value.trim(), adres, x, y, gemeente, provincie,
+      klantNaam: (getOffertes().find(o => o.kenmerk === document.getElementById('mq-projectnummer').value.trim())?.klantNaam || (document.getElementById('mq-projectnummer').value.trim() === document.getElementById('f-kenmerk').value.trim() ? getDropboxFieldValue(['f-klant']) : '')),
+      datum:new Date().toISOString(), buffer:25, bodemlagen, regionale, od, nhn, conclusie,
+      dekking:od?.inWerkgebied
+        ? 'Bodemloket-kaartlagen en het openbare bodeminformatiesysteem van ODNZKG zijn automatisch gecontroleerd.'
+        : 'Landelijke bodemkwaliteitskaarten en gekoppelde regionale zonelagen gecontroleerd. Voor bodemlocaties, onderzoeken, tanks en HBB is op deze locatie nog een regionale adapter nodig.'
+    };
+    quickscan.dekking += ' ' + nhn.summary + ' ODNHN-werkgebiedgrens, afzonderlijke tankregistraties en volledige onderzoeksrapporten zijn niet automatisch gecontroleerd.';
+    window._lastMilieuQuickscan = quickscan;
+    const kaartTreffers = regionale.treffers.map(t=>`${t.naam} (${t.regio})`);
+    const kleur = regionale.treffers.some(t=>t.niveau==='rood') || odRisico ? '#c62828' : (od?.inWerkgebied && !bronFouten ? '#2e7d32' : '#e65100');
+    resultaat.style.display = 'block';
+    const odHtml = od?.inWerkgebied ? (od.resultaten.length ? od.resultaten.map(l=>`${l.label}: ${l.count}`).join(', ') : 'geen geregistreerde objecten binnen 25 meter') : 'niet van toepassing / geen dekking';
+    resultaat.innerHTML = `<div style="border-left:5px solid ${kleur};padding:12px 14px;background:#f8f9fb;border-radius:0 6px 6px 0;"><div style="font-size:16px;font-weight:700;color:${kleur};">${quickscan.conclusie}</div><div style="font-size:11px;color:#777;margin-top:2px;">${adres} · RD ${Math.round(x)}, ${Math.round(y)} · buffer 25 m</div><div style="margin-top:9px;font-size:12px;"><b>Bodemkwaliteitskaart:</b> ${gegevens.length ? gegevens.map(g=>g.naam).join(', ') : 'geen klasse op deze locatie uit de landelijke WMS herkend'}</div><div style="margin-top:5px;font-size:12px;"><b>ODNZKG bodemregister:</b> ${odHtml}</div><div style="margin-top:5px;font-size:12px;"><b>ODNHN bodemregister:</b> ${nhn.summary}</div><div style="margin-top:5px;font-size:12px;"><b>Beschermings-/verbodszones:</b> ${kaartTreffers.length ? kaartTreffers.join(', ') : 'geen treffers in gekoppelde bronnen'}</div><div style="margin-top:8px;font-size:11px;color:#666;">${quickscan.dekking}</div></div><div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-success btn-sm" onclick="downloadMilieuQuickscanPdf()">📄 PDF downloaden + Dropbox</button><button class="btn btn-primary btn-sm" onclick="neemMilieuQuickscanOverInPva()">Overnemen in Plan van Aanpak</button><a class="btn btn-sm" href="https://www.bodemloket.nl/kaart" target="_blank" rel="noopener">Open Bodemloket</a></div>`;
+    status.textContent = 'Quickscan gereed'; status.style.color = '#2d7d46';
+  } catch (error) {
+    if (run !== window._milieuQuickscanRun) return;
+    status.textContent = 'Quickscan mislukt'; status.style.color = '#c62828';
+    resultaat.style.display = 'block'; resultaat.innerHTML = `<div style="color:#c62828;font-size:12px;">${error.message}</div>`;
+  }
+}
+
+
+function neemMilieuQuickscanOverInPva() {
+  const q = window._lastMilieuQuickscan;
+  if (!q) return alert('Voer eerst de milieuquickscan uit');
+  const opmerkingen = document.getElementById('pva-risico-opmerkingen');
+  const treffers = q.regionale.treffers || [];
+  const regel = `Geautomatiseerde milieuquickscan ${new Date(q.datum).toLocaleDateString('nl-NL')}: ${q.dekking}${treffers.length ? ' Gevonden zones: ' + treffers.map(t=>t.naam).join(', ') + '.' : ''}`;
+  if (opmerkingen && !opmerkingen.value.includes('Geautomatiseerde milieuquickscan')) opmerkingen.value = opmerkingen.value.trim() ? `${opmerkingen.value.trim()}\n${regel}` : regel;
+  const waterCb = document.getElementById('pva-r-waterkering'); if (waterCb) waterCb.checked = treffers.some(t=>t.groep==='waterkering');
+  const grondCb = document.getElementById('pva-r-boringsvrij'); if (grondCb) grondCb.checked = treffers.some(t=>t.groep==='grondwater');
+  switchTab('pva');
+}
+
+function downloadMilieuQuickscanPdf() {
+  const q = window._lastMilieuQuickscan;
+  if (!q) return alert('Voer eerst de milieuquickscan uit');
+  const {jsPDF} = window.jspdf;
+  const pdf = new jsPDF('p','mm','a4');
+  const M=18, W=210, CW=W-2*M; let y=18;
+  const blauw=[30,58,95], groen=[90,145,56], grijs=[100,100,100], rood=[198,40,40];
+  const text=(t,size=9,color=[33,33,33],bold=false)=>{pdf.setFontSize(size);pdf.setTextColor(...color);pdf.setFont('helvetica',bold?'bold':'normal');const regels=pdf.splitTextToSize(String(t),CW);pdf.text(regels,M,y);y+=regels.length*(size*0.42)+2;};
+  const kop=t=>{if(y>260){pdf.addPage();y=18;}y+=3;text(t,12,blauw,true);pdf.setDrawColor(...groen);pdf.setLineWidth(.6);pdf.line(M,y-1,M+CW,y-1);y+=4;};
+  pdf.setFillColor(...blauw);pdf.rect(0,0,W,31,'F');pdf.setTextColor(255,255,255);pdf.setFontSize(17);pdf.setFont('helvetica','bold');pdf.text('Milieuquickscan boorlocatie',M,15);pdf.setFontSize(9);pdf.setFont('helvetica','normal');pdf.text('Ground Research BV',M,23);y=40;
+  text(`Project: ${q.projectnummer || '-'}`,10,blauw,true);text(`Locatie: ${q.adres || '-'}`);text(`RD-coördinaat: X ${Math.round(q.x)} / Y ${Math.round(q.y)} | Onderzoeksbuffer: ${q.buffer} meter`);text(`Datum controle: ${new Date(q.datum).toLocaleString('nl-NL')}`,8,grijs);
+  kop('Doel en status');text('Deze geautomatiseerde milieuquickscan bundelt openbaar digitaal beschikbare gegevens voor de voorbereiding van een diepe boring. Het document is een voorcontrole en geen volledig NEN 5725-vooronderzoek zolang regionale archiefgegevens niet aantoonbaar volledig zijn geraadpleegd.');text(q.conclusie,12,q.regionale.treffers.some(t=>t.niveau==='rood')?rood:groen,true);text(q.dekking,9,grijs);
+  kop('Bodemkwaliteitskaart');q.bodemlagen.forEach(b=>text(`${b.fout?'Niet bereikbaar':b.gevonden?'Informatie gevonden':'Geen locatieklasse gevonden'} — ${b.naam}${b.gevonden&&b.tekst?': '+b.tekst.slice(0,350):''}`,8,b.fout?rood:[33,33,33]));
+  kop('Regionaal bodemregister');
+  if(q.od?.inWerkgebied){
+    if(q.od.resultaten?.length) q.od.resultaten.forEach(l=>text(`${l.label}: ${l.count} object(en) binnen de selectie. ${l.raw||''}`,8,rood));
+    else text('ODNZKG: geen bodemlocaties, onderzoeken, sanerings-/verontreinigingscontouren, zorgmaatregelen, adreslocaties of tanks binnen 25 meter gevonden.',9,groen);
+  } else text('De locatie valt niet binnen het automatisch gekoppelde ODNZKG-werkgebied. Regionale bodemregistercontrole is nog vereist.',9,rood);
+  if(q.nhn){kop('ODNHN bodemregister');text(q.nhn.summary,9,q.nhn.ok?grijs:rood);q.nhn.layers.forEach(l=>{text(`${l.label}: ${l.ok ? l.count+' kaartobject(en)' : 'niet bereikbaar'}${l.count>=100?' (resultaatlimiet bereikt)':''}`,9,l.ok?grijs:rood);if(l.raw)text(l.raw,8);});text('Bron: https://odnhn.nazca4u.nl/rapportage/ ? puntbevraging op het boorpunt. Geen volledige 25 m-buffer-, archief- of tankcontrole.',8,grijs);}
+  kop('Provinciale en waterschapszones');if(q.regionale.treffers.length)q.regionale.treffers.forEach(t=>text(`${t.niveau==='rood'?'ZWARE BEPERKING':'AANDACHT'} — ${t.naam} (${t.regio})`,9,t.niveau==='rood'?rood:[230,81,0],true));else text('Geen treffers in de momenteel gekoppelde regionale detailkaarten.',9,groen);
+  kop('Bronnen en vervolg');text('Geraadpleegd: PDOK Locatieserver; Bodemloket WMS (zonering, ontgraving en toepassing bovengrond); provincie Gelderland Omgevingsverordening; HHNK Legger waterveiligheid.');text('Nog te verifiëren: bodemlocaties, eerdere onderzoeken, HBB-activiteiten, tanks, gevallen van ernstige bodemverontreiniging, asbestkansenkaart en niet-openbare gemeentelijke milieu-/bouwarchieven. Bij signalen of ontbrekende dekking: regionale bodeminformatie opvragen en zo nodig bodemadviseur inschakelen.',9,rood);
+  const paginaAantal=pdf.getNumberOfPages();for(let i=1;i<=paginaAantal;i++){pdf.setPage(i);pdf.setFontSize(7);pdf.setTextColor(...grijs);pdf.text(`Ground Research BV — milieuquickscan — pagina ${i} van ${paginaAantal}`,M,291);}
+  const veilig=(q.projectnummer||q.adres||'locatie').replace(/[^a-zA-Z0-9_-]+/g,'_');
+  const filename = `Milieuquickscan_${veilig}.pdf`;
+  pdf.save(filename);
+  const saved = getOffertes().find(o => o.kenmerk === q.projectnummer);
+  const sameProject = q.projectnummer && q.projectnummer === (document.getElementById('f-kenmerk')?.value || '').trim();
+  const klant = q.klantNaam || saved?.klantNaam || (sameProject ? getDropboxFieldValue(['f-klant']) : '');
+  if (!q.projectnummer || !klant) {
+    showDropboxNotification('PDF gedownload; Dropbox niet opgeslagen: selecteer de juiste offerte met klant en projectnummer en voer de quickscan opnieuw uit.', 'error');
+    return;
+  }
+  uploadToDropbox(pdf, filename, klant, q.projectnummer, 'Bodemonderzoek', makeDropboxProjectRef(q.projectnummer, q.adres));
+}
+
+function formatVulverhouding(glycoltype, glycolconc) {
+  const type = String(glycoltype || '').trim();
+  if (!type || /^(water|geen glycol)$/i.test(type)) return '100% water';
+  const match = String(glycolconc || '').match(/\d+(?:[,.]\d+)?/);
+  const glycolPct = match ? Number(match[0].replace(',', '.')) : 30;
+  const waterPct = Math.max(0, 100 - glycolPct);
+  const netteType = type.replace(/ethyleen\s*glycol/i, 'ethyleenglycol').replace(/propyleen\s*glycol/i, 'propyleenglycol').toLowerCase();
+  return `${waterPct}% water / ${glycolPct}% ${netteType}`;
 }
 
 function generateOpleverPDF() {
@@ -4481,7 +4887,7 @@ function generateOpleverPDF() {
   fieldRow('Buis diameter', p.diameter + ' mm');
   fieldRow('Aantal bronnen', String(p.aantalBronnen));
   fieldRow('Diepte bronnen', p.bronnen.map(b => b.diepte + 'm').join(', '));
-  fieldRow('Gevuld', p.glycoltype === 'Water' ? '100% water' : (100 - parseInt(p.glycolconc)) + '% water + ' + p.glycolconc + ' ' + p.glycoltype.toLowerCase());
+  fieldRow('Gevuld', formatVulverhouding(p.glycoltype, p.glycolconc));
   fieldRow('Oplevering volgens', p.certificering);
   fieldRow('Boorvloeistof', p.boorvloeistof);
   fieldRow('Afdichting', p.afdichting);
@@ -4510,7 +4916,7 @@ function generateOpleverPDF() {
   // Tabelheader
   if (y + 8 > 275) { pdf.addPage(); y = 20; }
   pdf.setFillColor(240, 242, 245);
-  pdf.rect(M, y - 3, CW, 7, 'F');
+  pdf.rect(M, y - 2.5, CW, 5.5, 'F');
   pdf.setFontSize(8); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...BLAUW);
   const cx = [M+2, M+25, M+55, M+80, M+100, M+125, M+150];
   pdf.text('Lus \u00F8 mm', cx[0], y);
@@ -4541,8 +4947,6 @@ function generateOpleverPDF() {
     }
     pdf.setTextColor(...ZWART); pdf.setFont('helvetica', 'normal');
     y += 5;
-    pdf.setDrawColor(220, 220, 220); pdf.setLineWidth(0.15);
-    pdf.line(M, y - 2, M + CW, y - 2);
   }
   y += 8;
 
@@ -4564,7 +4968,7 @@ function generateOpleverPDF() {
     pdf.setTextColor(...ZWART);
   }
 
-  const glycolLabel = p.glycoltype === 'Water' ? 'water' : (100 - parseInt(p.glycolconc)) + '% water + ' + p.glycolconc + ' ' + p.glycoltype.toLowerCase();
+  const glycolLabel = formatVulverhouding(p.glycoltype, p.glycolconc);
   bulletLine(`Systeem is met een verhouding van ${glycolLabel} afgevuld en gecirculeerd.`);
   bulletLine(`${p.opleverdruk || 'Drukloos opgeleverd'}.`);
 
