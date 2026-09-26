@@ -4651,27 +4651,41 @@ async function startMilieuQuickscan() {
     }
     if (run !== window._milieuQuickscanRun) return;
     milieuQuickscanLog(nhn.summary);
+    milieuQuickscanLog('BRO-SLD: geregistreerde gebieden binnen 25 meter controleren...');
+    let bro;
+    try {
+      const response = await fetch('/api/milieu/bro-sld', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({x,y})});
+      bro = await response.json();
+      if (!response.ok || !bro.ok || !Array.isArray(bro.results)) throw new Error('BRO-broncontrole mislukt');
+      bro.summary = `BRO-SLD: ${bro.results.length} geregistreerd(e) gebied(en) binnen 25 m. Brondatum: ${new Date(bro.sourceUpdated).toLocaleDateString('nl-NL')}.`;
+    } catch {
+      bro = {ok:false,results:[],summary:'BRO-SLD: niet volledig gecontroleerd; bron niet bereikbaar of gegevens niet verwerkbaar.'};
+    }
+    if (run !== window._milieuQuickscanRun) return;
+    milieuQuickscanLog(bro.summary);
+
     const gemeente = pdok?.gemeentenaam || pdok?.gemeente_naam || 'Niet automatisch bepaald';
     const provincie = pdok?.provincienaam || pdok?.provincie_naam || 'Niet automatisch bepaald';
-    const bronFouten = bodemlagen.filter(b=>b.fout).length + regionale.fouten.length + (od?.ok===false || od?.layers?.some(l=>!l.ok) ? 1 : 0) + (nhn.ok ? 0 : 1);
+    const bronFouten = bodemlagen.filter(b=>b.fout).length + regionale.fouten.length + (od?.ok===false || od?.layers?.some(l=>!l.ok) ? 1 : 0) + (nhn.ok ? 0 : 1) + (bro.ok ? 0 : 1);
     const gegevens = bodemlagen.filter(b=>b.gevonden);
-    const odRisico = Boolean((od?.inWerkgebied && od.resultaten?.length) || nhn.resultaten.length);
+    const odRisico = Boolean((od?.inWerkgebied && od.resultaten?.length) || nhn.resultaten.length || bro.results.length);
     const conclusie = odRisico ? 'Bodeminformatie gevonden — handmatig beoordelen' : bronFouten ? 'Broncontrole onvolledig' : od?.inWerkgebied ? 'Geen geregistreerde bodeminformatie binnen 25 meter' : 'Aanvullende regionale bodembeoordeling vereist';
     const quickscan = {
       projectnummer:document.getElementById('mq-projectnummer').value.trim(), adres, x, y, gemeente, provincie,
       klantNaam: (getOffertes().find(o => o.kenmerk === document.getElementById('mq-projectnummer').value.trim())?.klantNaam || (document.getElementById('mq-projectnummer').value.trim() === document.getElementById('f-kenmerk').value.trim() ? getDropboxFieldValue(['f-klant']) : '')),
-      datum:new Date().toISOString(), buffer:25, bodemlagen, regionale, od, nhn, conclusie,
+      datum:new Date().toISOString(), buffer:25, bodemlagen, regionale, od, nhn, bro, conclusie,
       dekking:od?.inWerkgebied
         ? 'Bodemloket-kaartlagen en het openbare bodeminformatiesysteem van ODNZKG zijn automatisch gecontroleerd.'
         : 'Landelijke bodemkwaliteitskaarten en gekoppelde regionale zonelagen gecontroleerd. Voor bodemlocaties, onderzoeken, tanks en HBB is op deze locatie nog een regionale adapter nodig.'
     };
     quickscan.dekking += ' ' + nhn.summary + ' ODNHN-werkgebiedgrens, afzonderlijke tankregistraties en volledige onderzoeksrapporten zijn niet automatisch gecontroleerd.';
+    quickscan.dekking += ' ' + bro.summary + ' BRO-SLD is aanvullend: historische aanlevering loopt tot 2031; geen volledige regionale archiefcontrole.';
     window._lastMilieuQuickscan = quickscan;
     const kaartTreffers = regionale.treffers.map(t=>`${t.naam} (${t.regio})`);
     const kleur = regionale.treffers.some(t=>t.niveau==='rood') || odRisico ? '#c62828' : (od?.inWerkgebied && !bronFouten ? '#2e7d32' : '#e65100');
     resultaat.style.display = 'block';
     const odHtml = od?.inWerkgebied ? (od.resultaten.length ? od.resultaten.map(l=>`${l.label}: ${l.count}`).join(', ') : 'geen geregistreerde objecten binnen 25 meter') : 'niet van toepassing / geen dekking';
-    resultaat.innerHTML = `<div style="border-left:5px solid ${kleur};padding:12px 14px;background:#f8f9fb;border-radius:0 6px 6px 0;"><div style="font-size:16px;font-weight:700;color:${kleur};">${quickscan.conclusie}</div><div style="font-size:11px;color:#777;margin-top:2px;">${adres} · RD ${Math.round(x)}, ${Math.round(y)} · buffer 25 m</div><div style="margin-top:9px;font-size:12px;"><b>Bodemkwaliteitskaart:</b> ${gegevens.length ? gegevens.map(g=>g.naam).join(', ') : 'geen klasse op deze locatie uit de landelijke WMS herkend'}</div><div style="margin-top:5px;font-size:12px;"><b>ODNZKG bodemregister:</b> ${odHtml}</div><div style="margin-top:5px;font-size:12px;"><b>ODNHN bodemregister:</b> ${nhn.summary}</div><div style="margin-top:5px;font-size:12px;"><b>Beschermings-/verbodszones:</b> ${kaartTreffers.length ? kaartTreffers.join(', ') : 'geen treffers in gekoppelde bronnen'}</div><div style="margin-top:8px;font-size:11px;color:#666;">${quickscan.dekking}</div></div><div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-success btn-sm" onclick="downloadMilieuQuickscanPdf()">📄 PDF downloaden + Dropbox</button><button class="btn btn-primary btn-sm" onclick="neemMilieuQuickscanOverInPva()">Overnemen in Plan van Aanpak</button><a class="btn btn-sm" href="https://www.bodemloket.nl/kaart" target="_blank" rel="noopener">Open Bodemloket</a></div>`;
+    resultaat.innerHTML = `<div style="border-left:5px solid ${kleur};padding:12px 14px;background:#f8f9fb;border-radius:0 6px 6px 0;"><div style="font-size:16px;font-weight:700;color:${kleur};">${quickscan.conclusie}</div><div style="font-size:11px;color:#777;margin-top:2px;">${adres} · RD ${Math.round(x)}, ${Math.round(y)} · buffer 25 m</div><div style="margin-top:9px;font-size:12px;"><b>Bodemkwaliteitskaart:</b> ${gegevens.length ? gegevens.map(g=>g.naam).join(', ') : 'geen klasse op deze locatie uit de landelijke WMS herkend'}</div><div style="margin-top:5px;font-size:12px;"><b>ODNZKG bodemregister:</b> ${odHtml}</div><div style="margin-top:5px;font-size:12px;"><b>ODNHN bodemregister:</b> ${nhn.summary}</div><div style="margin-top:5px;font-size:12px;"><b>BRO-SLD gebiedscontrole:</b> ${bro.summary}</div><div style="margin-top:5px;font-size:12px;"><b>Beschermings-/verbodszones:</b> ${kaartTreffers.length ? kaartTreffers.join(', ') : 'geen treffers in gekoppelde bronnen'}</div><div style="margin-top:8px;font-size:11px;color:#666;">${quickscan.dekking}</div></div><div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-success btn-sm" onclick="downloadMilieuQuickscanPdf()">📄 PDF downloaden + Dropbox</button><button class="btn btn-primary btn-sm" onclick="neemMilieuQuickscanOverInPva()">Overnemen in Plan van Aanpak</button><a class="btn btn-sm" href="https://www.bodemloket.nl/kaart" target="_blank" rel="noopener">Open Bodemloket</a></div>`;
     status.textContent = 'Quickscan gereed'; status.style.color = '#2d7d46';
   } catch (error) {
     if (run !== window._milieuQuickscanRun) return;
@@ -4700,7 +4714,7 @@ function downloadMilieuQuickscanPdf() {
   const pdf = new jsPDF('p','mm','a4');
   const M=18, W=210, CW=W-2*M; let y=18;
   const blauw=[30,58,95], groen=[90,145,56], grijs=[100,100,100], rood=[198,40,40];
-  const text=(t,size=9,color=[33,33,33],bold=false)=>{pdf.setFontSize(size);pdf.setTextColor(...color);pdf.setFont('helvetica',bold?'bold':'normal');const regels=pdf.splitTextToSize(String(t),CW);pdf.text(regels,M,y);y+=regels.length*(size*0.42)+2;};
+  const text=(t,size=9,color=[33,33,33],bold=false)=>{pdf.setFontSize(size);pdf.setTextColor(...color);pdf.setFont('helvetica',bold?'bold':'normal');const regels=pdf.splitTextToSize(String(t),CW);for(const regel of regels){if(y+size*0.42>280){pdf.addPage();y=18;}pdf.text(regel,M,y);y+=size*0.42;}y+=2;};
   const kop=t=>{if(y>260){pdf.addPage();y=18;}y+=3;text(t,12,blauw,true);pdf.setDrawColor(...groen);pdf.setLineWidth(.6);pdf.line(M,y-1,M+CW,y-1);y+=4;};
   pdf.setFillColor(...blauw);pdf.rect(0,0,W,31,'F');pdf.setTextColor(255,255,255);pdf.setFontSize(17);pdf.setFont('helvetica','bold');pdf.text('Milieuquickscan boorlocatie',M,15);pdf.setFontSize(9);pdf.setFont('helvetica','normal');pdf.text('Ground Research BV',M,23);y=40;
   text(`Project: ${q.projectnummer || '-'}`,10,blauw,true);text(`Locatie: ${q.adres || '-'}`);text(`RD-coördinaat: X ${Math.round(q.x)} / Y ${Math.round(q.y)} | Onderzoeksbuffer: ${q.buffer} meter`);text(`Datum controle: ${new Date(q.datum).toLocaleString('nl-NL')}`,8,grijs);
@@ -4712,6 +4726,14 @@ function downloadMilieuQuickscanPdf() {
     else text('ODNZKG: geen bodemlocaties, onderzoeken, sanerings-/verontreinigingscontouren, zorgmaatregelen, adreslocaties of tanks binnen 25 meter gevonden.',9,groen);
   } else text('De locatie valt niet binnen het automatisch gekoppelde ODNZKG-werkgebied. Regionale bodemregistercontrole is nog vereist.',9,rood);
   if(q.nhn){kop('ODNHN bodemregister');text(q.nhn.summary,9,q.nhn.ok?grijs:rood);q.nhn.layers.forEach(l=>{text(`${l.label}: ${l.ok ? l.count+' kaartobject(en)' : 'niet bereikbaar'}${l.count>=100?' (resultaatlimiet bereikt)':''}`,9,l.ok?grijs:rood);if(l.raw)text(l.raw,8);});text('Bron: https://odnhn.nazca4u.nl/rapportage/ ? puntbevraging op het boorpunt. Geen volledige 25 m-buffer-, archief- of tankcontrole.',8,grijs);}
+  if(q.bro){
+    kop('BRO-SLD: gebiedscontrole binnen 25 meter');
+    text(q.bro.summary,9,q.bro.ok?grijs:rood);
+    q.bro.results.forEach(r=>text(`${r.broId} | ${r.kind} | ${r.name} | afstand ${r.distance} m | vervolg: ${r.followUp||'niet vermeld'}${r.underReview?' | in onderzoek':''}`,8));
+    text('Afstand tot geregistreerde RD-geometrie, inclusief binnenringen. Bron: PDOK BRO Overheidsbesluit bodemverontreiniging (SLD).',8,grijs);
+    if(q.bro.retrievedAt)text('Gegevens opgehaald: '+new Date(q.bro.retrievedAt).toLocaleString('nl-NL'),8,grijs);
+    text('Historische aanlevering loopt tot 1 januari 2031. Geen volledige ODNHN-, HBB-, tank- of onderzoeksarchiefcontrole. Geen treffer betekent niet dat de bodem schoon is.',9,rood);
+  }
   kop('Provinciale en waterschapszones');if(q.regionale.treffers.length)q.regionale.treffers.forEach(t=>text(`${t.niveau==='rood'?'ZWARE BEPERKING':'AANDACHT'} — ${t.naam} (${t.regio})`,9,t.niveau==='rood'?rood:[230,81,0],true));else text('Geen treffers in de momenteel gekoppelde regionale detailkaarten.',9,groen);
   kop('Bronnen en vervolg');text('Geraadpleegd: PDOK Locatieserver; Bodemloket WMS (zonering, ontgraving en toepassing bovengrond); provincie Gelderland Omgevingsverordening; HHNK Legger waterveiligheid.');text('Nog te verifiëren: bodemlocaties, eerdere onderzoeken, HBB-activiteiten, tanks, gevallen van ernstige bodemverontreiniging, asbestkansenkaart en niet-openbare gemeentelijke milieu-/bouwarchieven. Bij signalen of ontbrekende dekking: regionale bodeminformatie opvragen en zo nodig bodemadviseur inschakelen.',9,rood);
   const paginaAantal=pdf.getNumberOfPages();for(let i=1;i<=paginaAantal;i++){pdf.setPage(i);pdf.setFontSize(7);pdf.setTextColor(...grijs);pdf.text(`Ground Research BV — milieuquickscan — pagina ${i} van ${paginaAantal}`,M,291);}
