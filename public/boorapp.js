@@ -2664,16 +2664,45 @@ function generatePDF() {
     return bannerH + 10;
   }
 
-  function addCostTableRow(label, amount, y, even) {
-    if (even) {
-      doc.setFillColor(...LIGHT_GRAY);
-      doc.rect(M, y - 3, PW, 8, 'F');
+  // Keep all specification content above the footer, including long tables.
+  const COST_BOTTOM = 278;
+  function costSpace(y, height) {
+    if (y + height > COST_BOTTOM) {
+      addFooter();
+      doc.addPage();
+      return addHeader('KOSTENSPECIFICATIE', false);
     }
+    return y;
+  }
+
+  function costRowLayout(label) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text(label, M + 4, y + 2);
-    doc.text(eur(amount || 0), W - M - 4, y + 2, { align: 'right' });
-    return y + 8;
+    const lines = doc.splitTextToSize(String(label), PW - 50);
+    return { lines, height: Math.max(8, lines.length * 5 + 3) };
+  }
+
+  function addCostTableRow(label, amount, y, even) {
+    const { lines, height } = costRowLayout(label);
+    y = costSpace(y, Math.min(height, COST_BOTTOM - 60));
+    // Exceptionally long descriptions can continue over more than one page.
+    let offset = 0;
+    while (offset < lines.length) {
+      y = costSpace(y, 8);
+      const count = Math.min(lines.length - offset, Math.floor((COST_BOTTOM - y - 3) / 5));
+      const rowHeight = Math.max(8, count * 5 + 3);
+      if (even) {
+        doc.setFillColor(...LIGHT_GRAY);
+        doc.rect(M, y - 3, PW, rowHeight, 'F');
+      }
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      lines.slice(offset, offset + count).forEach((line, i) => doc.text(line, M + 4, y + 2 + i * 5));
+      if (offset === 0) doc.text(eur(amount || 0), W - M - 4, y + 2, { align: 'right' });
+      offset += count;
+      y += rowHeight;
+    }
+    return y;
   }
 
   const clustersPdf = (d.clusters || []).map((c, i) => {
@@ -2757,16 +2786,22 @@ function generatePDF() {
   y += 8;
 
   clustersPdf.forEach(item => {
-    if (y > 250) { addFooter(); doc.addPage(); y = addHeader('KOSTENSPECIFICATIE', false); }
     const name = item.cluster.label || `Cluster ${item.idx}`;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    const titleLines = doc.splitTextToSize(`${name} - ${Number(item.cluster.vermogen || 0).toFixed(1)} kW`, PW - 6);
+    const titleHeight = Math.max(8, titleLines.length * 5 + 3);
+    const rowsHeight = COST_ITEMS.reduce((sum, ci) => sum + costRowLayout(ci.label).height, 0)
+      + costRowLayout(`${name} subtotaal`).height;
+    y = costSpace(y, titleHeight + 5 + rowsHeight + 5);
     doc.setFillColor(...MEDIUM_BLUE);
-    doc.rect(M, y - 4, PW, 8, 'F');
+    doc.rect(M, y - 4, PW, titleHeight, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
-    doc.text(`${name} - ${Number(item.cluster.vermogen || 0).toFixed(1)} kW`, M + 3, y + 1);
+    titleLines.forEach((line, i) => doc.text(line, M + 3, y + 1 + i * 5));
     doc.setTextColor(0, 0, 0);
-    y += 8;
+    y += titleHeight;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.text(`Bronnen: ${item.calc.boringen} | Diepte/bron: ${item.calc.diepte}m | Diameter: ${item.calc.diameter}mm | Luslengte: ${item.calc.luslengte}m`, M + 3, y);
@@ -2780,7 +2815,7 @@ function generatePDF() {
     y += 5;
   });
 
-  if (y > 245) { addFooter(); doc.addPage(); y = addHeader('KOSTENSPECIFICATIE', false); }
+  y = costSpace(y, 22);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.text('Vrije regels', M, y);
@@ -2798,7 +2833,7 @@ function generatePDF() {
   }
 
   y += 4;
-  if (y > 245) { addFooter(); doc.addPage(); y = addHeader('KOSTENSPECIFICATIE', false); }
+  y = costSpace(y, 22);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.text('Kostenspecificatie totaal', M, y);
@@ -2818,6 +2853,7 @@ function generatePDF() {
     even = !even;
   });
 
+  y = costSpace(y, 22);
   y += 4;
   doc.setDrawColor(...MEDIUM_BLUE);
   doc.line(M, y, W - M, y);
